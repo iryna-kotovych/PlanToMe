@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnp*
+
+# builds
+.next/
+out/
+build/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# env & secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+service-account*.json
+client_secret*.json
+credentials*.json
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# vercel
+.vercel/
+
+# os / editor
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+
+# next.js / typescript
+next-env.d.ts
+*.tsbuildinfo
+
+# playwright
+blob-report/
+playwright/.cache/

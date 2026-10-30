@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* Design tokens from docs/SPEC.md §8. Light mode only. */
+@theme {
+  --color-canvas: #faf8f4;
+  --color-ink: #141414;
+  --color-muted: #5b6b80;
+  --color-line: #e9e5de;
+  --color-accent: #ff7a2f;
+  --color-accent-light: #ffb15c;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
