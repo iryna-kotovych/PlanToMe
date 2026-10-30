@@ -10,7 +10,7 @@ A calm, minimal daily to-do app for iPhone, built as an installable web app (PWA
 - Untimed tasks roll over to the next day automatically; timed ones get a gentle 20:00 check-in. Reminders 15 minutes before.
 - Installs from the Home Screen, no App Store. Updates itself on every push.
 
-**Status:** in development. Live demo with sample data: _coming soon_.
+**Status:** in development. Live demo with sample data: **[plantome-demo.vercel.app](https://plantome-demo.vercel.app)** (best on iPhone: Share → Add to Home Screen).
 
 Built by [Iryna Kotovych](https://github.com/iryna-kotovych) as a product manager working with Claude Code as the engineer. Product spec: [`docs/SPEC.md`](docs/SPEC.md).
 
