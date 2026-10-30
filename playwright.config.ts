@@ -12,6 +12,9 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "on-first-retry",
+    // Tests check behavior, not animations, and must not hit a cached app shell.
+    reducedMotion: "reduce",
+    serviceWorkers: "block",
   },
   projects: [
     {
@@ -25,5 +28,6 @@ export default defineConfig({
     command: process.env.CI ? "npm run start" : "npm run dev",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
+    env: { NEXT_PUBLIC_DEMO_MODE: "true" },
   },
 });
