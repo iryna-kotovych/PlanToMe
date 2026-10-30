@@ -24,9 +24,10 @@ describe("proxy", () => {
     expect(response.headers.get("location")).toBe("https://planto-me.test/login");
   });
 
-  it("lets signed-out visitors open the sign-in page and the auth callback", async () => {
+  it("lets signed-out visitors open sign-in, the privacy policy and the auth callback", async () => {
     const proxy = await loadProxy();
     expect((await proxy(request("/login"))).headers.get("location")).toBeNull();
+    expect((await proxy(request("/privacy"))).headers.get("location")).toBeNull();
     expect((await proxy(request("/auth/callback"))).headers.get("location")).toBeNull();
   });
 

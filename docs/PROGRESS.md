@@ -13,15 +13,18 @@
 ## In progress
 
 - Owner tests the demo on iPhone and gives feedback.
+- **Phase 2 — Real app:**
+  - Done in code: Supabase schema with Row Level Security on every table, sign-in with Google for the one allowed account (checked by the server, a sign-up hook and every table policy), tasks and check-offs synced between devices with an offline queue, public privacy policy at `/privacy`.
+  - Done in services: Supabase project (EU), Vercel project `planto-me` with its settings.
+  - Waiting for: Google Cloud sign-in keys (owner), then switch on Google sign-in in Supabase, deploy, and test on iPhone and Mac.
 
 ## Next
 
-- **Phase 2 — Real app:** Supabase, Google sign-in for one email, synced tasks.
+- **Phase 3 — Google Calendar:** events in the list, timed tasks written to the calendar.
 
 ## Open questions
 
 - Swipe direction: now a finger swipe to the left shows the next day (like turning a page). Confirm, or flip it.
-- Production URL: `plantome.vercel.app` is taken by someone else. Pick another name in Phase 2.
 
 ## Decisions
 
@@ -32,3 +35,5 @@
 - Demo: a one-time tip for first-time visitors. If the swipe direction changes, update its text.
 - Node 24 LTS on CI and Vercel. Local Mac runs Node 26, which is compatible.
 - Accent buttons use near-black icons on the orange gradient: white on orange is below the 3:1 contrast minimum.
+- Real app address: https://planto-me.vercel.app (`plantome.vercel.app` was taken).
+- Google sign-in app is published "In production" without Google's verification, so calendar access doesn't expire every 7 days. No logo on the consent screen: a logo would require verification.

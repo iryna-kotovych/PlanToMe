@@ -7,7 +7,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 // Runs before every page of the real app: refreshes the Supabase session
 // cookie and lets only the owner's account through. The demo is public.
 
-const PUBLIC_PATHS = ["/login", "/auth/"];
+const PUBLIC_PATHS = ["/login", "/privacy", "/auth/"];
 
 export async function proxy(request: NextRequest) {
   if (DEMO_MODE) return NextResponse.next();

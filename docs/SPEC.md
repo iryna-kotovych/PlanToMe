@@ -98,6 +98,7 @@ Owner: Iryna Kotovych · Timezone: Europe/Madrid · Interface language: **Englis
 - Scope: `https://www.googleapis.com/auth/calendar.events` (minimum needed for read + write of events).
 - Refresh tokens are stored server-side only, encrypted, never sent to the browser.
 - ⚠️ A Google OAuth app left in "Testing" status issues refresh tokens that expire after 7 days. Set the consent screen to "In production" (unverified is fine for personal use; the owner sees the "Google hasn't verified this app" screen once).
+- Publishing needs the Branding page filled in: home page `https://planto-me.vercel.app`, privacy policy `https://planto-me.vercel.app/privacy`, authorised domains `planto-me.vercel.app` and the Supabase project domain (`<project-ref>.supabase.co`). No logo: uploading one makes Google require verification.
 
 ### 5.2 Voice input (free)
 
@@ -180,6 +181,7 @@ Rules:
 - Seeds, fixtures, tests and screenshots use invented data only.
 - **Production app:** sign-in with Google, restricted to a single allowed email (`ALLOWED_EMAIL` env var). Anyone else is rejected server-side.
 - AI and Google API calls happen only on the server.
+- A public privacy policy at `/privacy`, linked from the sign-in page and from Google's consent screen. Keep it true whenever the app starts using data in a new way (new provider, new kind of data).
 
 ## 7. Public demo
 
