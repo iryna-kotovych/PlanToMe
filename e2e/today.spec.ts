@@ -35,6 +35,17 @@ test("shows today's events, tasks and habits in one list", async ({ page }) => {
   await expect(row(page, "Renew library card")).toContainText("from Sun");
 });
 
+test("first-time visitors get a tip they can dismiss for good", async ({ page }) => {
+  const tip = page.getByRole("region", { name: "Welcome to the demo" });
+  await expect(tip).toContainText("Swipe left");
+  await tip.getByRole("button", { name: "Dismiss tip" }).click();
+  await expect(tip).toHaveCount(0);
+
+  await page.reload();
+  await expect(heading(page)).toContainText("Monday, Nov 2");
+  await expect(tip).toHaveCount(0);
+});
+
 test("checked items sink to the bottom and stay checked", async ({ page }) => {
   const checkbox = page.getByRole("checkbox", { name: "Done: Buy flowers for Ana" });
   await checkbox.click();

@@ -28,6 +28,7 @@
 - Days can be viewed from today up to 7 days ahead.
 - Demo sample data is invented by the engineer.
 - App icon: "List row" — a checked round checkbox next to two text lines, white on the orange gradient. Source: `src/app/icon.svg`; PNGs and splash screens via `node scripts/generate-icons.mjs`.
-- GitHub: secret scanning, push protection and Dependabot alerts are on.
+- GitHub: secret scanning, push protection, Dependabot alerts and Dependabot security updates (automatic fix PRs) are on.
+- Demo: a one-time tip for first-time visitors. If the swipe direction changes, update its text.
 - Node 24 LTS on CI and Vercel. Local Mac runs Node 26, which is compatible.
 - Accent buttons use near-black icons on the orange gradient: white on orange is below the 3:1 contrast minimum.

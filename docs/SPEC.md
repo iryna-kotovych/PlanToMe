@@ -185,6 +185,7 @@ Rules:
 - Voice and image input in the demo run against canned example results (so the owner's free quotas and keys can't be abused). The demo never asks for the microphone.
 - Typed text in the demo is understood by a small built-in rule-based parser (days, times and repeats in English, Russian and Ukrainian), so it needs no AI.
 - A small "Demo — sample data" label.
+- First-time visitors see a short, dismissible tip: swipe for the coming days, type a task, try the mic and the paperclip. Once dismissed it stays hidden in that browser.
 
 ---
 

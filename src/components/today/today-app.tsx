@@ -27,6 +27,7 @@ import { AddBar } from "./add-bar";
 import { DayHeader } from "./day-header";
 import { DayList } from "./day-list";
 import { DemoBar } from "./demo-bar";
+import { DemoHint } from "./demo-hint";
 import { EventDetails } from "./event-details";
 import { Sheet } from "./sheet";
 import { TaskForm } from "./task-form";
@@ -250,6 +251,7 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         <div ref={pagerRef} className="min-h-full touch-pan-y px-5 pb-6 select-none">
+          {DEMO_MODE && <DemoHint />}
           {items && (
             <DayList
               key={day}
