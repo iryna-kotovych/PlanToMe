@@ -8,14 +8,14 @@
   - Demo mode: invented calendar, tasks and habits stored in the browser, Reset, "Demo — sample data" label, canned voice and picture results, a small rule-based parser for typed text (en/ru/uk), carry-over of unfinished untimed tasks.
   - PWA: manifest, app icon, 11 iPhone splash screens, offline app shell (service worker), "new version" prompt, safe areas.
   - Tests: 39 unit tests (dates, repeats, list order, carry-over, parser, demo data), 12 iPhone e2e tests.
+- **Phase 1 — Deploy:** Vercel project `plantome-demo`, connected to GitHub (Vercel app has access to this repo only), every push to `main` deploys to https://plantome-demo.vercel.app. Linked from the README.
 
 ## In progress
 
-- Phase 1: deploy the demo to Vercel (`plantome-demo.vercel.app`) and add the link to the README.
+- Owner tests the demo on iPhone and gives feedback.
 
 ## Next
 
-- Owner tests the demo on iPhone and gives feedback.
 - **Phase 2 — Real app:** Supabase, Google sign-in for one email, synced tasks.
 
 ## Open questions
