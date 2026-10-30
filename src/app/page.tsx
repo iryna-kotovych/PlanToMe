@@ -1,14 +1,7 @@
 import { TodayApp } from "@/components/today/today-app";
-import { DEMO_MODE } from "@/lib/env";
 
+// The same screen serves the public demo and the owner's real app; which
+// backend it uses is decided by NEXT_PUBLIC_DEMO_MODE at build time.
 export default function Home() {
-  if (DEMO_MODE) return <TodayApp />;
-
-  // The signed-in app arrives in Phase 2; until then only the demo runs.
-  return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-      <h1 className="text-3xl font-semibold tracking-tight">PlanToMe</h1>
-      <p className="text-base text-muted">Sign-in is coming soon.</p>
-    </main>
-  );
+  return <TodayApp />;
 }

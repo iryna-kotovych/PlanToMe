@@ -13,16 +13,18 @@ import { useCalendarEvents } from "@/hooks/use-calendar-events";
 import { useServiceWorker } from "@/hooks/use-service-worker";
 import { useSwipe, type SwipeDirection } from "@/hooks/use-swipe";
 import { useToday } from "@/hooks/use-today";
+import type { Backend } from "@/lib/backend";
 import { toTask, type CaptureResult } from "@/lib/capture/types";
+import { cloudBackend } from "@/lib/cloud/cloud-backend";
+import { cloudStore } from "@/lib/cloud/cloud-store";
 import { addDays, MAX_DAYS_AHEAD, relativeDayLabel } from "@/lib/dates";
 import { buildDayItems } from "@/lib/day-items";
-import { demoCapture } from "@/lib/demo/demo-capture";
-import { demoStore, useDemoData } from "@/lib/demo/demo-store";
-import { mockCalendar } from "@/lib/demo/mock-calendar";
-import type { DemoData } from "@/lib/demo/seed";
+import { demoBackend } from "@/lib/demo/demo-backend";
+import { demoStore } from "@/lib/demo/demo-store";
 import { DEMO_MODE } from "@/lib/env";
 import { prefersReducedMotion } from "@/lib/motion";
-import type { Attachment, DayItem, Task } from "@/lib/types";
+import type { Attachment, DayItem, Task, TaskData } from "@/lib/types";
+import { AccountBar } from "./account-bar";
 import { AddBar } from "./add-bar";
 import { DayHeader } from "./day-header";
 import { DayList } from "./day-list";
@@ -33,11 +35,13 @@ import { Sheet } from "./sheet";
 import { TaskForm } from "./task-form";
 import { Toast, type ToastData } from "./toast";
 
+const backend: Backend = DEMO_MODE ? demoBackend : cloudBackend;
+
 type SheetState = { type: "task"; id: string } | { type: "event"; id: string };
 
 export function TodayApp() {
   const today = useToday();
-  const data = useDemoData();
+  const data = backend.useData();
   if (today === null || data === null) {
     return <div className="h-dvh" aria-busy="true" />;
   }
@@ -49,10 +53,11 @@ function whenLabel(task: Task, today: string): string {
   return task.time ? `${day}, ${task.time}` : day;
 }
 
-function TodayScreen({ today, data }: { today: string; data: DemoData }) {
+function TodayScreen({ today, data }: { today: string; data: TaskData }) {
   const [offset, setOffset] = useState(0);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const [toast, setToast] = useState<ToastData | null>(null);
+  const syncStatus = backend.useSyncStatus();
   const scrollRef = useRef<HTMLElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
   // The day being animated to, while a page turn is in flight.
@@ -60,15 +65,16 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
   const toastCount = useRef(0);
 
   const day = addDays(today, offset);
-  const events = useCalendarEvents(mockCalendar, today);
+  const events = useCalendarEvents(backend.calendar, today);
   const items = useMemo(
     () => events && buildDayItems(day, data.tasks, events, data.done),
     [day, data, events],
   );
 
+  // Unfinished untimed tasks from past days move to today (spec 5.4).
   useEffect(() => {
-    demoStore.carryOver(today);
-  }, [today]);
+    backend.carryOver(today);
+  }, [today, data]);
 
   const showToast = useCallback((next: Omit<ToastData, "id">) => {
     toastCount.current += 1;
@@ -181,7 +187,7 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
     );
     const [first] = tasks;
     if (!first) return;
-    demoStore.addTasks(tasks);
+    backend.addTasks(tasks);
     const details =
       tasks.length === 1
         ? [whenLabel(first, today)]
@@ -196,7 +202,7 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
       actions: [
         {
           label: "Undo",
-          onClick: () => demoStore.removeTasks(tasks.map((task) => task.id)),
+          onClick: () => backend.removeTasks(tasks.map((task) => task.id)),
         },
         { label: "Edit", onClick: () => setSheet({ type: "task", id: first.id }) },
       ],
@@ -213,11 +219,11 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
   }
 
   function deleteTask(task: Task) {
-    demoStore.removeTasks([task.id]);
+    backend.removeTasks([task.id]);
     closeSheet();
     showToast({
       message: "Task deleted.",
-      actions: [{ label: "Undo", onClick: () => demoStore.addTasks([task]) }],
+      actions: [{ label: "Undo", onClick: () => backend.addTasks([task]) }],
     });
   }
 
@@ -237,7 +243,11 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
   return (
     <div className="mx-auto flex h-dvh w-full max-w-xl flex-col">
       <header className="shrink-0 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
-        {DEMO_MODE && <DemoBar onReset={resetDemo} />}
+        {DEMO_MODE ? (
+          <DemoBar onReset={resetDemo} />
+        ) : (
+          <AccountBar status={syncStatus} onSignOut={() => void cloudStore.signOut()} />
+        )}
         <DayHeader
           day={day}
           offset={offset}
@@ -257,7 +267,7 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
               key={day}
               items={items}
               today={today}
-              onToggle={(item) => demoStore.toggleDone(item.id, day)}
+              onToggle={(item) => backend.toggleDone(item.id, day)}
               onOpen={openItem}
             />
           )}
@@ -265,10 +275,12 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
       </main>
 
       <AddBar
-        onText={(text) => capture(() => demoCapture.fromText(text, today))}
-        onVoice={() => capture(() => demoCapture.fromVoice(null, today))}
+        voice={backend.features.voice}
+        files={backend.features.files}
+        onText={(text) => capture(() => backend.capture.fromText(text, today))}
+        onVoice={() => capture(() => backend.capture.fromVoice(null, today))}
         onFile={(file) =>
-          capture(() => demoCapture.fromFile(file, today), {
+          capture(() => backend.capture.fromFile(file, today), {
             name: file.name,
             type: file.type,
             size: file.size,
@@ -284,8 +296,9 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
             key={sheetTask.id}
             task={sheetTask}
             today={today}
+            attachments={backend.features.files}
             onSave={(task) => {
-              demoStore.updateTask(task);
+              backend.updateTask(task);
               closeSheet();
             }}
             onDelete={deleteTask}
@@ -298,7 +311,7 @@ function TodayScreen({ today, data }: { today: string; data: DemoData }) {
             item={sheetEvent}
             day={day}
             today={today}
-            onToggle={() => demoStore.toggleDone(sheetEvent.id, day)}
+            onToggle={() => backend.toggleDone(sheetEvent.id, day)}
           />
         </Sheet>
       )}

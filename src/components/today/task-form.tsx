@@ -31,11 +31,14 @@ const WEEKDAY_NAMES = [
 export function TaskForm({
   task,
   today,
+  attachments,
   onSave,
   onDelete,
 }: {
   task: Task;
   today: string;
+  /** Whether files can be attached yet. */
+  attachments: boolean;
   onSave: (task: Task) => void;
   onDelete: (task: Task) => void;
 }) {
@@ -275,40 +278,42 @@ export function TaskForm({
         />
       </div>
 
-      <div>
-        <span className={FIELD_LABEL}>Attachment</span>
-        {attachment ? (
-          <div className="flex items-center gap-2.5 rounded-xl border border-line bg-white py-1 pr-1 pl-3.5">
-            <PaperclipIcon className="size-4 shrink-0 text-muted" />
-            <span className="min-w-0 flex-1 truncate text-base">
-              {attachment.name}
-            </span>
-            <button
-              type="button"
-              onClick={() => setAttachment(null)}
-              className="min-h-11 px-3 text-sm font-medium text-muted"
-            >
-              Remove
-            </button>
-          </div>
-        ) : (
-          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-base text-muted">
-            <PaperclipIcon className="size-5" />
-            Add a photo or file
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  setAttachment({ name: file.name, type: file.type, size: file.size });
-                }
-              }}
-            />
-          </label>
-        )}
-      </div>
+      {attachments && (
+        <div>
+          <span className={FIELD_LABEL}>Attachment</span>
+          {attachment ? (
+            <div className="flex items-center gap-2.5 rounded-xl border border-line bg-white py-1 pr-1 pl-3.5">
+              <PaperclipIcon className="size-4 shrink-0 text-muted" />
+              <span className="min-w-0 flex-1 truncate text-base">
+                {attachment.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                className="min-h-11 px-3 text-sm font-medium text-muted"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-base text-muted">
+              <PaperclipIcon className="size-5" />
+              Add a photo or file
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    setAttachment({ name: file.name, type: file.type, size: file.size });
+                  }
+                }}
+              />
+            </label>
+          )}
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="text-sm font-medium">

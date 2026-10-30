@@ -59,6 +59,12 @@ export interface CalendarEvent {
 /** Done marks keyed by `${itemId}@${day}`, so each habit occurrence has its own. */
 export type DoneMarks = Record<string, true>;
 
+/** Everything the day list needs besides calendar events. */
+export interface TaskData {
+  tasks: Task[];
+  done: DoneMarks;
+}
+
 export type ItemKind = "event" | "task" | "habit";
 
 /** One row of the day list. */

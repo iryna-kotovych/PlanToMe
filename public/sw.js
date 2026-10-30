@@ -47,9 +47,10 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
-  // Live data and update checks always go to the network.
+  // Live data, sign-in and update checks always go to the network.
   if (
     url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/auth/") ||
     url.pathname === "/version.json" ||
     url.pathname === "/sw.js"
   ) {

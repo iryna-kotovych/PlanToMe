@@ -28,10 +28,15 @@ function formatSeconds(total: number): string {
 
 /** The fixed bottom bar: attach, type, or record (spec 4.2). */
 export function AddBar({
+  voice,
+  files,
   onText,
   onVoice,
   onFile,
 }: {
+  /** Whether recording and attaching are available yet. */
+  voice: boolean;
+  files: boolean;
   onText: (text: string) => Promise<void>;
   onVoice: () => Promise<void>;
   onFile: (file: File) => Promise<void>;
@@ -111,29 +116,43 @@ export function AddBar({
   }
 
   const hasText = text.trim().length > 0;
+  const showMic = voice && !(hasText && mode === "idle");
+  const spinner = (
+    <span
+      aria-hidden="true"
+      className="size-5 animate-spin rounded-full border-2 border-ink/25 border-t-ink"
+    />
+  );
 
   return (
     <form
       onSubmit={submit}
-      className="shrink-0 border-t border-line bg-canvas pt-2 pr-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pl-1.5"
+      className={cn(
+        "shrink-0 border-t border-line bg-canvas pt-2 pr-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]",
+        files ? "pl-1.5" : "pl-3",
+      )}
     >
       <div className="flex items-center gap-1.5">
-        <IconButton
-          label="Attach a photo or file"
-          disabled={mode !== "idle"}
-          onClick={() => fileInput.current?.click()}
-        >
-          <PaperclipIcon className="size-5.5" />
-        </IconButton>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*,application/pdf"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="sr-only"
-          onChange={pickFile}
-        />
+        {files && (
+          <>
+            <IconButton
+              label="Attach a photo or file"
+              disabled={mode !== "idle"}
+              onClick={() => fileInput.current?.click()}
+            >
+              <PaperclipIcon className="size-5.5" />
+            </IconButton>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*,application/pdf"
+              tabIndex={-1}
+              aria-hidden="true"
+              className="sr-only"
+              onChange={pickFile}
+            />
+          </>
+        )}
 
         {mode === "recording" ? (
           <p
@@ -163,9 +182,18 @@ export function AddBar({
           />
         )}
 
-        {hasText && mode === "idle" ? (
-          <button type="submit" aria-label="Add task" className={ROUND_BUTTON}>
-            <ArrowUpIcon className="size-5.5" strokeWidth={2.2} />
+        {!showMic ? (
+          <button
+            type="submit"
+            aria-label={mode === "working" ? "Working on it" : "Add task"}
+            disabled={!hasText || mode !== "idle"}
+            className={ROUND_BUTTON}
+          >
+            {mode === "working" ? (
+              spinner
+            ) : (
+              <ArrowUpIcon className="size-5.5" strokeWidth={2.2} />
+            )}
           </button>
         ) : (
           <button
@@ -187,10 +215,7 @@ export function AddBar({
             className={ROUND_BUTTON}
           >
             {mode === "working" ? (
-              <span
-                aria-hidden="true"
-                className="size-5 animate-spin rounded-full border-2 border-ink/25 border-t-ink"
-              />
+              spinner
             ) : mode === "recording" ? (
               <StopIcon className="size-5" />
             ) : (

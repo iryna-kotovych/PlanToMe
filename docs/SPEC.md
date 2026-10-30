@@ -163,9 +163,12 @@ Rules:
 
 ### 5.7 Sync & storage
 
-- Supabase Postgres is the source of truth for tasks, completions, recurrence rules, push subscriptions, settings and encrypted Google tokens.
-- Row Level Security on every table.
+- Supabase Postgres is the source of truth for tasks, completions, recurrence rules, push subscriptions, settings and encrypted Google tokens. A task's recurrence rule is stored with the task (one rule per task).
+- Timed tasks are stored as UTC instants; days and wall-clock times are computed in Europe/Madrid.
+- Row Level Security on every table. Only the allowed email can get an account at all (a "before user created" hook), and every policy also checks that email.
 - Optimistic UI: actions apply instantly and sync in the background; queue changes when offline and replay when back online.
+- Each device keeps a copy of the data, so the app opens instantly and works offline. Changes from the other device arrive within seconds (Supabase Realtime) and on every app open.
+- A small status line shows "Saving…" or "Offline · changes are kept on this device" only when something isn't synced yet.
 
 ---
 

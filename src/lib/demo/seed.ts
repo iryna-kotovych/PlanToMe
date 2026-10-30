@@ -1,12 +1,9 @@
 import { carryOver } from "@/lib/carry-over";
 import { addDays } from "@/lib/dates";
 import { doneKey } from "@/lib/day-items";
-import type { DoneMarks, Task } from "@/lib/types";
+import type { Task, TaskData } from "@/lib/types";
 
-export interface DemoData {
-  tasks: Task[];
-  done: DoneMarks;
-}
+export type DemoData = TaskData;
 
 function task(id: string, title: string, date: string, extra: Partial<Task> = {}): Task {
   return {
