@@ -6,7 +6,7 @@
 
 ## In progress
 
-- Waiting for the owner's "ok" on Phase 0 and a choice of app icon.
+- Waiting for the owner's "ok" on Phase 0.
 
 ## Next
 
@@ -20,4 +20,6 @@
 
 - Days can be viewed from today up to 7 days ahead.
 - Demo sample data is invented by the engineer.
+- App icon: "List row" — a checked round checkbox next to two text lines, white on the orange gradient.
+- GitHub: secret scanning, push protection and Dependabot alerts are on.
 - Node 24 LTS on CI and Vercel. Local Mac runs Node 26, which is compatible.
