@@ -42,14 +42,15 @@ Owner: Iryna Kotovych · Timezone: Europe/Madrid · Interface language: **Englis
 
 ### 4.1 Today (the only main screen)
 
-- Full-screen list for one day. Small header with the date ("Friday, Oct 30") and a subtle "Today" label when on the current day.
+- Full-screen list for one day. Small header with the date ("Friday, Oct 30") and a subtle "Today" label when on the current day ("Tomorrow" on the next one).
 - **One list, no sections.** Calendar events, tasks and habits are mixed together:
   - Untimed items first (all-day calendar events, untimed tasks, habits).
   - Then timed items in chronological order, each showing its time (e.g. `09:30`) on the left. A time range is shown if the item has an end time.
 - Every item has a round checkbox. Checking it strikes the item through, softens its color and moves it to the bottom of the list (with a gentle animation). Unchecking restores it.
 - A small, quiet icon distinguishes the source: calendar event, task, habit (recurring). No colored tags, no clutter.
 - Tap an item → edit sheet (title, date, time, recurrence, note, attachment, delete).
-- **Swipe right → next day.** Swipe back → previous day, but not earlier than today. Days are viewable up to 7 days ahead (today + 7). Tapping the date header jumps back to today.
+- **Swipe right → next day.** Swipe back → previous day, but not earlier than today. Days are viewable up to 7 days ahead (today + 7). Tapping the date header jumps back to today. Small previous/next arrows beside the date do the same as swiping (for accessibility, and the arrow keys work on the Mac).
+- Calendar events open a read-only sheet: they can be checked off in the app, never edited.
 - Pull down to refresh (re-syncs Google Calendar).
 - Empty day: one calm line of copy, no illustrations needed.
 
@@ -181,7 +182,8 @@ Rules:
 
 - A separate deployment (same code, `NEXT_PUBLIC_DEMO_MODE=true`) linked from the README.
 - No sign-in, no real Google account, no real keys. Uses a mock calendar and sample tasks; data is kept in the visitor's browser and can be reset.
-- Voice and image input in the demo run against canned example results (so the owner's free quotas and keys can't be abused).
+- Voice and image input in the demo run against canned example results (so the owner's free quotas and keys can't be abused). The demo never asks for the microphone.
+- Typed text in the demo is understood by a small built-in rule-based parser (days, times and repeats in English, Russian and Ukrainian), so it needs no AI.
 - A small "Demo — sample data" label.
 
 ---

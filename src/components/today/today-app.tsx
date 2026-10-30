@@ -1,0 +1,305 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { flushSync } from "react-dom";
+import { useCalendarEvents } from "@/hooks/use-calendar-events";
+import { useServiceWorker } from "@/hooks/use-service-worker";
+import { useSwipe, type SwipeDirection } from "@/hooks/use-swipe";
+import { useToday } from "@/hooks/use-today";
+import { toTask, type CaptureResult } from "@/lib/capture/types";
+import { addDays, MAX_DAYS_AHEAD, relativeDayLabel } from "@/lib/dates";
+import { buildDayItems } from "@/lib/day-items";
+import { demoCapture } from "@/lib/demo/demo-capture";
+import { demoStore, useDemoData } from "@/lib/demo/demo-store";
+import { mockCalendar } from "@/lib/demo/mock-calendar";
+import type { DemoData } from "@/lib/demo/seed";
+import { DEMO_MODE } from "@/lib/env";
+import { prefersReducedMotion } from "@/lib/motion";
+import type { Attachment, DayItem, Task } from "@/lib/types";
+import { AddBar } from "./add-bar";
+import { DayHeader } from "./day-header";
+import { DayList } from "./day-list";
+import { DemoBar } from "./demo-bar";
+import { EventDetails } from "./event-details";
+import { Sheet } from "./sheet";
+import { TaskForm } from "./task-form";
+import { Toast, type ToastData } from "./toast";
+
+type SheetState = { type: "task"; id: string } | { type: "event"; id: string };
+
+export function TodayApp() {
+  const today = useToday();
+  const data = useDemoData();
+  if (today === null || data === null) {
+    return <div className="h-dvh" aria-busy="true" />;
+  }
+  return <TodayScreen today={today} data={data} />;
+}
+
+function whenLabel(task: Task, today: string): string {
+  const day = relativeDayLabel(task.date, today);
+  return task.time ? `${day}, ${task.time}` : day;
+}
+
+function TodayScreen({ today, data }: { today: string; data: DemoData }) {
+  const [offset, setOffset] = useState(0);
+  const [sheet, setSheet] = useState<SheetState | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const scrollRef = useRef<HTMLElement>(null);
+  const pagerRef = useRef<HTMLDivElement>(null);
+  // The day being animated to, while a page turn is in flight.
+  const pendingOffset = useRef<number | null>(null);
+  const toastCount = useRef(0);
+
+  const day = addDays(today, offset);
+  const events = useCalendarEvents(mockCalendar, today);
+  const items = useMemo(
+    () => events && buildDayItems(day, data.tasks, events, data.done),
+    [day, data, events],
+  );
+
+  useEffect(() => {
+    demoStore.carryOver(today);
+  }, [today]);
+
+  const showToast = useCallback((next: Omit<ToastData, "id">) => {
+    toastCount.current += 1;
+    setToast({ ...next, id: toastCount.current });
+  }, []);
+  const dismissToast = useCallback(() => setToast(null), []);
+  const closeSheet = useCallback(() => setSheet(null), []);
+
+  useServiceWorker(() =>
+    showToast({
+      message: "A new version is ready.",
+      persistent: true,
+      actions: [{ label: "Reload", onClick: () => window.location.reload() }],
+    }),
+  );
+
+  function currentOffset(): number {
+    return pendingOffset.current ?? offset;
+  }
+
+  /** Pages to another day with a short slide, or instantly with reduced motion. */
+  function goTo(target: number, fromX = 0) {
+    const pager = pagerRef.current;
+    const from = currentOffset();
+    const next = Math.min(Math.max(target, 0), MAX_DAYS_AHEAD);
+    if (next === from) {
+      pager?.style.removeProperty("transform");
+      return;
+    }
+    const show = () => {
+      pendingOffset.current = null;
+      flushSync(() => setOffset(next));
+      scrollRef.current?.scrollTo({ top: 0 });
+    };
+    // A second tap mid-animation skips straight to the new day.
+    if (!pager || pendingOffset.current !== null || prefersReducedMotion()) {
+      pager?.getAnimations().forEach((animation) => animation.cancel());
+      pager?.style.removeProperty("transform");
+      show();
+      return;
+    }
+    pendingOffset.current = next;
+    const direction = next > from ? 1 : -1;
+    const leave = pager.animate(
+      [
+        { transform: `translateX(${fromX}px)`, opacity: 1 },
+        { transform: `translateX(${-direction * 30}%)`, opacity: 0 },
+      ],
+      { duration: 160, easing: "ease-in", fill: "forwards" },
+    );
+    leave.finished.then(
+      () => {
+        show();
+        pager.style.removeProperty("transform");
+        pager.animate(
+          [
+            { transform: `translateX(${direction * 30}%)`, opacity: 0 },
+            { transform: "none", opacity: 1 },
+          ],
+          { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+        );
+        leave.cancel();
+      },
+      () => undefined,
+    );
+  }
+
+  function canStep(direction: SwipeDirection): boolean {
+    const target = currentOffset() + direction;
+    return target >= 0 && target <= MAX_DAYS_AHEAD;
+  }
+
+  useSwipe(pagerRef, {
+    canSwipe: canStep,
+    onSwipe: (direction, offsetX) => goTo(currentOffset() + direction, offsetX),
+  });
+
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (sheet || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest("input, textarea, select, [contenteditable]")
+    ) {
+      return;
+    }
+    if (event.key === "ArrowRight") goTo(currentOffset() + 1);
+    if (event.key === "ArrowLeft") goTo(currentOffset() - 1);
+  });
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => onKeyDown(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
+
+  async function capture(
+    run: () => Promise<CaptureResult>,
+    attachment: Attachment | null = null,
+  ) {
+    let result: CaptureResult;
+    try {
+      result = await run();
+    } catch {
+      showToast({ message: "Couldn't add that. Please try again." });
+      return;
+    }
+    const tasks = result.tasks.map((parsed, index) =>
+      toTask(parsed, crypto.randomUUID(), index === 0 ? attachment : null),
+    );
+    const [first] = tasks;
+    if (!first) return;
+    demoStore.addTasks(tasks);
+    const details =
+      tasks.length === 1
+        ? [whenLabel(first, today)]
+        : [tasks.map((task) => task.title).join(", ")];
+    if (result.transcript) details.push(`Heard: “${result.transcript}”`);
+    showToast({
+      message:
+        tasks.length === 1
+          ? `Added “${first.title}”`
+          : `Added ${tasks.length} tasks`,
+      details,
+      actions: [
+        {
+          label: "Undo",
+          onClick: () => demoStore.removeTasks(tasks.map((task) => task.id)),
+        },
+        { label: "Edit", onClick: () => setSheet({ type: "task", id: first.id }) },
+      ],
+    });
+  }
+
+  function resetDemo() {
+    const previous = demoStore.reset(today);
+    goTo(0);
+    showToast({
+      message: "Sample data restored.",
+      actions: [{ label: "Undo", onClick: () => demoStore.replace(previous) }],
+    });
+  }
+
+  function deleteTask(task: Task) {
+    demoStore.removeTasks([task.id]);
+    closeSheet();
+    showToast({
+      message: "Task deleted.",
+      actions: [{ label: "Undo", onClick: () => demoStore.addTasks([task]) }],
+    });
+  }
+
+  function openItem(item: DayItem) {
+    setSheet({ type: item.kind === "event" ? "event" : "task", id: item.id });
+  }
+
+  const sheetTask =
+    sheet?.type === "task"
+      ? data.tasks.find((task) => task.id === sheet.id)
+      : undefined;
+  const sheetEvent =
+    sheet?.type === "event"
+      ? items?.find((item) => item.kind === "event" && item.id === sheet.id)
+      : undefined;
+
+  return (
+    <div className="mx-auto flex h-dvh w-full max-w-xl flex-col">
+      <header className="shrink-0 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+        {DEMO_MODE && <DemoBar onReset={resetDemo} />}
+        <DayHeader
+          day={day}
+          offset={offset}
+          onToday={() => goTo(0)}
+          onStep={(direction) => goTo(currentOffset() + direction)}
+        />
+      </header>
+
+      <main
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
+        <div ref={pagerRef} className="min-h-full touch-pan-y px-5 pb-6 select-none">
+          {items && (
+            <DayList
+              key={day}
+              items={items}
+              today={today}
+              onToggle={(item) => demoStore.toggleDone(item.id, day)}
+              onOpen={openItem}
+            />
+          )}
+        </div>
+      </main>
+
+      <AddBar
+        onText={(text) => capture(() => demoCapture.fromText(text, today))}
+        onVoice={() => capture(() => demoCapture.fromVoice(null, today))}
+        onFile={(file) =>
+          capture(() => demoCapture.fromFile(file, today), {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+          })
+        }
+      />
+
+      <Toast toast={toast} onDismiss={dismissToast} />
+
+      {sheetTask && (
+        <Sheet title="Edit task" onClose={closeSheet}>
+          <TaskForm
+            key={sheetTask.id}
+            task={sheetTask}
+            today={today}
+            onSave={(task) => {
+              demoStore.updateTask(task);
+              closeSheet();
+            }}
+            onDelete={deleteTask}
+          />
+        </Sheet>
+      )}
+      {sheetEvent && (
+        <Sheet title="Calendar event" onClose={closeSheet}>
+          <EventDetails
+            item={sheetEvent}
+            day={day}
+            today={today}
+            onToggle={() => demoStore.toggleDone(sheetEvent.id, day)}
+          />
+        </Sheet>
+      )}
+    </div>
+  );
+}
