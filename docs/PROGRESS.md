@@ -26,17 +26,18 @@
     - Undo keeps check-offs.
   - A second independent review of the rewritten sync found 8 more issues; all fixed, each with a test that fails on the old code.
   - Tests: 86 unit tests, including 22 for the sync store against an in-memory fake Supabase; 17 iPhone e2e tests.
-  - Waiting for: owner signs in and runs the iPhone + Mac checklist.
+  - Owner checklist (Nov 2): steps 1–8 pass on iPhone and Mac — sign-in, Home Screen app, sync both ways, offline start and catch-up. Waiting for step 9, the next-morning carry-over (Nov 3).
 
 ## Known limits
 
 - Until the evening wrap-up (Phase 5), an unfinished **timed** task stays on its day and disappears from view the next day.
-- The free Supabase project pauses after 7 days without use. Supabase emails first; restore it from the dashboard.
+- The free Supabase project pauses after a week without use (a few requests a day keep it awake). Supabase emails first; **Resume project** in the dashboard brings it back with all data, up to a year later. The free plan has no time limit and is never billed: over a quota, Supabase warns, then restricts (e.g. read-only) until the quota refills next month.
+- Free plan room (Nov 2): database 11 MB of 500 MB, mostly Supabase's own tables; a task row is ~120 bytes. Files: 1 GB, so Phase 4 must shrink screenshots before storing them.
 - Only the last 30 days of one-off tasks and check-offs are loaded.
 
 ## Next
 
-- **Phase 3 — Google Calendar:** events in the list, timed tasks written to the calendar.
+- **Phase 3 — Google Calendar:** events in the list, timed tasks written to the calendar. Plan sent Nov 2; waiting for the owner's ok.
 
 ## Open questions
 
