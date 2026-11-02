@@ -89,6 +89,17 @@ describe("quickParse", () => {
     });
   });
 
+  it("keeps a range that passes midnight, and drops an empty one", () => {
+    expect(parseOne("party 22:00-01:00")).toMatchObject({
+      time: "22:00",
+      endTime: "01:00",
+    });
+    expect(parseOne("call 10:00-10:00")).toMatchObject({
+      time: "10:00",
+      endTime: null,
+    });
+  });
+
   it("knows the day after tomorrow", () => {
     expect(parseOne("послезавтра сходить в спортзал")).toMatchObject({
       title: "Сходить в спортзал",

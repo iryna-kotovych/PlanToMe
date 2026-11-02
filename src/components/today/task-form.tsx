@@ -1,7 +1,13 @@
 import { useId, useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
 import { dayOfMonth, weekdayOf } from "@/lib/dates";
-import type { Attachment, Recurrence, Task } from "@/lib/types";
+import {
+  NOTE_MAX,
+  TITLE_MAX,
+  type Attachment,
+  type Recurrence,
+  type Task,
+} from "@/lib/types";
 import { ChevronDownIcon, PaperclipIcon, TrashIcon } from "../icons";
 import { ACCENT_FILL, FIELD, FIELD_LABEL, PRIMARY_BUTTON } from "./styles";
 
@@ -97,8 +103,8 @@ export function TaskForm({
       setError("Pick a day.");
       return;
     }
-    if (time && endTime && endTime <= time) {
-      setError("The end time must be after the start time.");
+    if (time && endTime === time) {
+      setError("The end time can't be the same as the start time.");
       return;
     }
     const sameUntimedDay = date === task.date && !time;
@@ -135,6 +141,7 @@ export function TaskForm({
           id={`${id}-title`}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
+          maxLength={TITLE_MAX}
           autoComplete="off"
           className={FIELD}
         />
@@ -179,8 +186,14 @@ export function TaskForm({
               type="time"
               value={endTime}
               onChange={(event) => setEndTime(event.target.value)}
+              aria-describedby={endTime && endTime < time ? `${id}-next-day` : undefined}
               className={FIELD}
             />
+            {endTime && endTime < time && (
+              <p id={`${id}-next-day`} className="mt-1.5 text-sm text-muted">
+                Ends the next day.
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -274,6 +287,7 @@ export function TaskForm({
           rows={3}
           value={note}
           onChange={(event) => setNote(event.target.value)}
+          maxLength={NOTE_MAX}
           className={cn(FIELD, "resize-none")}
         />
       </div>

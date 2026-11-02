@@ -28,16 +28,21 @@ export const AttachmentSchema = z.object({
   size: z.number().int().nonnegative(),
 });
 
+/** Same limits as the database (public.tasks). */
+export const TITLE_MAX = 500;
+export const NOTE_MAX = 5000;
+
 export const TaskSchema = z.object({
   id: z.string().min(1),
-  title: z.string().min(1),
+  title: z.string().min(1).max(TITLE_MAX),
   // For recurring items, the first day they occur.
   date: DaySchema,
   // HH:mm in the app time zone; null for untimed tasks.
   time: TimeSchema.nullable(),
+  // An end before the start means the next morning (22:00–01:00).
   endTime: TimeSchema.nullable(),
   recurrence: RecurrenceSchema.nullable(),
-  note: z.string().nullable(),
+  note: z.string().max(NOTE_MAX).nullable(),
   attachment: AttachmentSchema.nullable(),
   // Original day of an untimed task that was carried over.
   carriedFrom: DaySchema.nullable(),

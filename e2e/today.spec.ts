@@ -136,6 +136,19 @@ test("edits a task in the sheet", async ({ page }) => {
   await expect(row(page, "Buy tulips for Ana")).toContainText("12:30");
 });
 
+test("a time range can pass midnight", async ({ page }) => {
+  const input = page.getByRole("textbox", { name: "New task" });
+  await input.fill("party 22:00-01:00");
+  await input.press("Enter");
+  await expect(row(page, "Party")).toContainText("22:00 to 01:00");
+
+  await row(page, "Party").getByRole("button").click();
+  const sheet = page.getByRole("dialog", { name: "Edit task" });
+  await expect(sheet.getByText("Ends the next day.")).toBeVisible();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
+});
+
 test("calendar events are read-only but can be checked off", async ({ page }) => {
   await row(page, "Team stand-up").getByRole("button").click();
   const sheet = page.getByRole("dialog", { name: "Calendar event" });

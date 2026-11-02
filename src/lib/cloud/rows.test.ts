@@ -49,6 +49,30 @@ describe("task rows", () => {
     expect(rowToTask(row)?.time).toBe("08:00");
   });
 
+  it("ends a range that passes midnight on the next morning", () => {
+    const party: Task = { ...task, time: "22:00", endTime: "01:00" };
+    const row = taskToRow(party);
+    expect(row).toMatchObject({
+      starts_at: "2026-10-31T21:00:00.000Z",
+      ends_at: "2026-11-01T00:00:00.000Z",
+    });
+    expect(rowToTask(row)).toEqual(party);
+  });
+
+  it("leaves out an end that equals the start", () => {
+    expect(taskToRow({ ...task, endTime: "15:00" }).ends_at).toBeNull();
+  });
+
+  it("moves a time skipped by the spring clock change an hour later", () => {
+    // 2027-03-28: Madrid jumps from 02:00 to 03:00.
+    expect(toInstant("2027-03-28", "02:30")).toBe("2027-03-28T01:30:00.000Z");
+    expect(toInstant("2027-03-28", "03:30")).toBe("2027-03-28T01:30:00.000Z");
+    // 02:30–03:30 that night is one instant: the end is left out, not rejected.
+    const row = taskToRow({ ...task, date: "2027-03-28", time: "02:30", endTime: "03:30" });
+    expect(row.starts_at).toBe("2027-03-28T01:30:00.000Z");
+    expect(row.ends_at).toBeNull();
+  });
+
   it("rejects rows that are not valid tasks", () => {
     const broken: TaskRow = { ...taskToRow(task), recurrence: { kind: "hourly" } };
     expect(rowToTask(broken)).toBeNull();

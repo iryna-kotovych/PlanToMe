@@ -131,6 +131,8 @@ function parseLine(line: string, today: string): ParsedTask | null {
   if (range) {
     time = clock(Number(range[1]), Number(range[2]));
     endTime = clock(Number(range[3]), Number(range[4]));
+    // "10:00-10:00" has no length; an earlier end means the next morning.
+    if (endTime === time) endTime = null;
   } else {
     const twelveHour = take(MERIDIEM);
     if (twelveHour) {

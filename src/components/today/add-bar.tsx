@@ -8,6 +8,7 @@ import {
   type PointerEvent,
 } from "react";
 import { cn } from "@/lib/cn";
+import { TITLE_MAX } from "@/lib/types";
 import { IconButton } from "../icon-button";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { ACCENT_FILL } from "./styles";
@@ -175,6 +176,7 @@ export function AddBar({
             onChange={(event) => setText(event.target.value)}
             aria-label="New task"
             placeholder={mode === "working" ? "Working on it…" : "Add a task…"}
+            maxLength={TITLE_MAX}
             disabled={mode === "working"}
             enterKeyHint="send"
             autoComplete="off"
