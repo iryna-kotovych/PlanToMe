@@ -31,6 +31,15 @@ describe("proxy", () => {
     expect((await proxy(request("/auth/callback"))).headers.get("location")).toBeNull();
   });
 
+  it("keeps every other page private, even ones named like public pages", async () => {
+    const proxy = await loadProxy();
+    for (const path of ["/auth/connect", "/privacy-notes", "/login-help"]) {
+      expect((await proxy(request(path))).headers.get("location")).toBe(
+        "https://planto-me.test/login",
+      );
+    }
+  });
+
   it("leaves the public demo open", async () => {
     vi.stubEnv("NEXT_PUBLIC_DEMO_MODE", "true");
     vi.resetModules();

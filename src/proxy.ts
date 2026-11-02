@@ -7,7 +7,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 // Runs before every page of the real app: refreshes the Supabase session
 // cookie and lets only the owner's account through. The demo is public.
 
-const PUBLIC_PATHS = ["/login", "/privacy", "/auth/"];
+// Exact paths, so a new page never becomes public by sharing a prefix.
+const PUBLIC_PATHS = new Set(["/login", "/privacy", "/auth/callback"]);
 
 export async function proxy(request: NextRequest) {
   if (DEMO_MODE) return NextResponse.next();
@@ -34,7 +35,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const email = typeof data?.claims.email === "string" ? data.claims.email : null;
   const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.some((prefix) => path.startsWith(prefix));
+  const isPublic = PUBLIC_PATHS.has(path);
 
   const redirectTo = (pathname: string, error?: string) => {
     const url = request.nextUrl.clone();

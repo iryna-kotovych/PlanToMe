@@ -29,7 +29,9 @@ export function SignInCard() {
     }
   }
 
-  const message = failed ? ERRORS["sign-in"] : error ? ERRORS[error] : null;
+  // Only our own codes: the link could carry anything, even "__proto__".
+  const known = error !== null && Object.hasOwn(ERRORS, error) ? ERRORS[error] : null;
+  const message = failed ? ERRORS["sign-in"] : known;
 
   return (
     <div className="w-full max-w-sm text-center">
