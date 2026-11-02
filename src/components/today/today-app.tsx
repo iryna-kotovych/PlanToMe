@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { flushSync } from "react-dom";
-import { useCalendarEvents } from "@/hooks/use-calendar-events";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useServiceWorker } from "@/hooks/use-service-worker";
 import { useSwipe, type SwipeDirection } from "@/hooks/use-swipe";
 import { useToday } from "@/hooks/use-today";
@@ -26,6 +26,7 @@ import { prefersReducedMotion } from "@/lib/motion";
 import type { Attachment, DayItem, Task, TaskData } from "@/lib/types";
 import { AccountBar } from "./account-bar";
 import { AddBar } from "./add-bar";
+import { CalendarNotice } from "./calendar-notice";
 import { DayHeader } from "./day-header";
 import { DayList } from "./day-list";
 import { DemoBar } from "./demo-bar";
@@ -82,16 +83,21 @@ function TodayScreen({ today, data }: { today: string; data: TaskData }) {
   const syncStatus = backend.useSyncStatus();
   const scrollRef = useRef<HTMLElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
+  const pullIndicatorRef = useRef<HTMLSpanElement>(null);
   // The day being animated to, while a page turn is in flight.
   const pendingOffset = useRef<number | null>(null);
   const toastCount = useRef(0);
 
   const day = addDays(today, offset);
-  const events = useCalendarEvents(backend.calendar, today);
+  const calendar = backend.calendar.useCalendar(today);
   const items = useMemo(
-    () => events && buildDayItems(day, data.tasks, events, data.done),
-    [day, data, events],
+    () => buildDayItems(day, data.tasks, calendar.events, data.done),
+    [day, data, calendar.events],
   );
+  const calendarNotice =
+    calendar.connection === "notConnected" || calendar.connection === "reconnect"
+      ? calendar.connection
+      : null;
 
   // Unfinished untimed tasks from past days move to today (spec 5.4).
   useEffect(() => {
@@ -112,6 +118,12 @@ function TodayScreen({ today, data }: { today: string; data: TaskData }) {
       actions: [{ label: "Reload", onClick: () => window.location.reload() }],
     }),
   );
+
+  const refreshing = usePullToRefresh(scrollRef, pullIndicatorRef, async () => {
+    if (!(await backend.calendar.refresh())) {
+      showToast({ message: "Couldn't refresh the calendar. Check your connection." });
+    }
+  });
 
   function currentOffset(): number {
     return pendingOffset.current ?? offset;
@@ -265,7 +277,7 @@ function TodayScreen({ today, data }: { today: string; data: TaskData }) {
       : undefined;
   const sheetEvent =
     sheet?.type === "event"
-      ? items?.find((item) => item.kind === "event" && item.id === sheet.id)
+      ? items.find((item) => item.kind === "event" && item.id === sheet.id)
       : undefined;
 
   return (
@@ -293,17 +305,32 @@ function TodayScreen({ today, data }: { today: string; data: TaskData }) {
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
+        {/* Waits just above the list and slides into view as a pull goes on. */}
+        <div aria-hidden="true" className="pointer-events-none relative h-0">
+          <span
+            ref={pullIndicatorRef}
+            className="absolute -top-10 left-1/2 -ml-3 size-6 rounded-full border-2 border-line border-t-muted opacity-0"
+          />
+        </div>
+        {refreshing && (
+          <div role="status" className="flex h-10 items-center justify-center">
+            <span
+              aria-hidden="true"
+              className="size-5 rounded-full border-2 border-line border-t-muted motion-safe:animate-spin"
+            />
+            <span className="sr-only">Refreshing the calendar</span>
+          </div>
+        )}
         <div ref={pagerRef} className="min-h-full touch-pan-y px-5 pb-6 select-none">
           {DEMO_MODE && <DemoHint />}
-          {items && (
-            <DayList
-              key={day}
-              items={items}
-              today={today}
-              onToggle={(item) => backend.toggleDone(item.id, day)}
-              onOpen={openItem}
-            />
-          )}
+          {calendarNotice && <CalendarNotice connection={calendarNotice} />}
+          <DayList
+            key={day}
+            items={items}
+            today={today}
+            onToggle={(item) => backend.toggleDone(item.id, day)}
+            onOpen={openItem}
+          />
         </div>
       </main>
 

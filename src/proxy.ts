@@ -7,8 +7,15 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 // Runs before every page of the real app: refreshes the Supabase session
 // cookie and lets only the owner's account through. The demo is public.
 
-// Exact paths, so a new page never becomes public by sharing a prefix.
-const PUBLIC_PATHS = new Set(["/login", "/privacy", "/auth/callback"]);
+// Exact paths, so a new page never becomes public by sharing a prefix. The
+// Google Calendar callback checks its own one-time state instead.
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/privacy",
+  "/auth/callback",
+  "/auth/connect/callback",
+  "/auth/connect/done",
+]);
 
 export async function proxy(request: NextRequest) {
   if (DEMO_MODE) return NextResponse.next();
@@ -37,25 +44,34 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.has(path);
 
+  // Keeps any refreshed session cookies, and their no-cache headers.
+  const withSession = (next: NextResponse) => {
+    response.cookies.getAll().forEach((cookie) => next.cookies.set(cookie));
+    ["cache-control", "expires", "pragma"].forEach((key) => {
+      const value = response.headers.get(key);
+      if (value) next.headers.set(key, value);
+    });
+    return next;
+  };
+
   const redirectTo = (pathname: string, error?: string) => {
     const url = request.nextUrl.clone();
     url.pathname = pathname;
     url.search = error ? `?error=${error}` : "";
-    const redirect = NextResponse.redirect(url);
-    // Keep any refreshed session cookies, and their no-cache headers.
-    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-    ["cache-control", "expires", "pragma"].forEach((key) => {
-      const value = response.headers.get(key);
-      if (value) redirect.headers.set(key, value);
-    });
-    return redirect;
+    return withSession(NextResponse.redirect(url));
   };
+
+  // The app's own requests get a status they can act on, not a sign-in page.
+  const refuse = (error?: string) =>
+    path.startsWith("/api/")
+      ? withSession(NextResponse.json({ error: "unauthorized" }, { status: 401 }))
+      : redirectTo("/login", error);
 
   if (email && !isAllowedEmail(email)) {
     await supabase.auth.signOut();
-    return isPublic ? response : redirectTo("/login", "not-allowed");
+    return isPublic ? response : refuse("not-allowed");
   }
-  if (!email && !isPublic) return redirectTo("/login");
+  if (!email && !isPublic) return refuse();
   if (email && path === "/login") return redirectTo("/");
   return response;
 }

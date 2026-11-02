@@ -22,7 +22,7 @@ export default function PrivacyPage() {
       </Link>
 
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">Privacy policy</h1>
-      <p className="mt-2 text-sm text-muted">Last updated October 30, 2026</p>
+      <p className="mt-2 text-sm text-muted">Last updated November 2, 2026</p>
 
       <div className="mt-8 space-y-8 text-base leading-relaxed">
         <p>
@@ -34,8 +34,9 @@ export default function PrivacyPage() {
           <ul>
             <li>Your Google account&apos;s email address, to check that you are the owner.</li>
             <li>
-              Events in your primary Google Calendar, to show them in your day list. PlanToMe
-              changes or deletes only the events it created for your timed tasks.
+              Events in your primary Google Calendar for the coming week, to show them in your
+              day list. Tasks with a time are added there as events, and PlanToMe changes or
+              deletes only the events it created for your tasks.
             </li>
             <li>The tasks, habits, notes and files you add.</li>
             <li>
@@ -55,6 +56,10 @@ export default function PrivacyPage() {
             <li>
               Google access tokens are stored encrypted on the server and never sent to the
               browser.
+            </li>
+            <li>
+              Each device you use keeps a copy of your day list, calendar events included, so
+              PlanToMe opens without a connection.
             </li>
             <li>
               Voice recordings go to a speech-to-text service (Groq, with Cloudflare Workers AI

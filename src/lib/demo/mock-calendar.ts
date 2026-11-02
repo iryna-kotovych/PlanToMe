@@ -1,5 +1,6 @@
-import type { CalendarProvider } from "@/lib/calendar/types";
-import { addDays, dayKey, daysBetween, weekdayOf } from "@/lib/dates";
+import { useMemo } from "react";
+import type { CalendarProvider, CalendarView } from "@/lib/calendar/types";
+import { addDays, daysBetween, MAX_DAYS_AHEAD, weekdayOf } from "@/lib/dates";
 import type { CalendarEvent } from "@/lib/types";
 
 // Invented events, placed relative to today so the demo always looks current.
@@ -34,13 +35,18 @@ export function mockEventsOn(day: string, today: string): CalendarEvent[] {
   return events;
 }
 
-export const mockCalendar: CalendarProvider = {
-  async listEvents({ from, to }) {
-    const today = dayKey(new Date());
+function useMockCalendar(today: string): CalendarView {
+  return useMemo(() => {
     const events: CalendarEvent[] = [];
-    for (let day = from; day <= to; day = addDays(day, 1)) {
+    for (let day = today; day <= addDays(today, MAX_DAYS_AHEAD); day = addDays(day, 1)) {
       events.push(...mockEventsOn(day, today));
     }
-    return events;
-  },
+    return { events, connection: "connected" };
+  }, [today]);
+}
+
+export const mockCalendar: CalendarProvider = {
+  useCalendar: useMockCalendar,
+  // Nothing to fetch; the short wait lets the refresh indicator show.
+  refresh: () => new Promise((resolve) => window.setTimeout(() => resolve(true), 600)),
 };

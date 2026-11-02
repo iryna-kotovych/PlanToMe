@@ -136,6 +136,17 @@ test("edits a task in the sheet", async ({ page }) => {
   await expect(row(page, "Buy tulips for Ana")).toContainText("12:30");
 });
 
+test("a one-off task can't be moved to a past day", async ({ page }) => {
+  await row(page, "Buy flowers for Ana").getByRole("button").click();
+  const sheet = page.getByRole("dialog", { name: "Edit task" });
+  // Typed dates get past the date picker's minimum.
+  await sheet.getByLabel("Date").fill("2026-11-01");
+  await sheet.getByRole("button", { name: "Save" }).click();
+
+  await expect(sheet.getByRole("alert")).toHaveText("Pick today or a later day.");
+  await expect(sheet).toBeVisible();
+});
+
 test("a time range can pass midnight", async ({ page }) => {
   const input = page.getByRole("textbox", { name: "New task" });
   await input.fill("party 22:00-01:00");
@@ -170,4 +181,46 @@ test("reset brings back the sample data", async ({ page }) => {
 
   await page.getByRole("button", { name: "Reset" }).click();
   await expect(row(page, "Buy flowers for Ana")).toBeVisible();
+});
+
+test("pulling the list down from the top refreshes the calendar", async ({ page }) => {
+  // Touch events as the iPhone sends them; the list is already at the top.
+  await page.getByRole("main").evaluate((main) => {
+    const touch = (type: string, y: number | null) => {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, "touches", {
+        value: y === null ? [] : [{ clientX: 200, clientY: y }],
+      });
+      main.dispatchEvent(event);
+    };
+    touch("touchstart", 150);
+    touch("touchmove", 220);
+    touch("touchmove", 290);
+    touch("touchend", null);
+  });
+  const status = page.getByRole("status").filter({ hasText: "Refreshing the calendar" });
+  await expect(status).toBeAttached();
+  await expect(status).not.toBeAttached();
+  await expect(row(page, "Team stand-up")).toBeVisible();
+});
+
+test("a short pull doesn't refresh", async ({ page }) => {
+  await page.getByRole("main").evaluate((main) => {
+    const touch = (type: string, y: number | null) => {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, "touches", {
+        value: y === null ? [] : [{ clientX: 200, clientY: y }],
+      });
+      main.dispatchEvent(event);
+    };
+    touch("touchstart", 150);
+    touch("touchmove", 200);
+    touch("touchend", null);
+  });
+  await expect(page.getByText("Refreshing the calendar")).not.toBeAttached();
+});
+
+test("the demo never asks to connect Google Calendar", async ({ page }) => {
+  await expect(row(page, "Team stand-up")).toBeVisible();
+  await expect(page.getByText("Connect", { exact: true })).toHaveCount(0);
 });

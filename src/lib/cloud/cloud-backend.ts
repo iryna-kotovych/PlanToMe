@@ -1,15 +1,8 @@
 import type { Backend } from "@/lib/backend";
-import type { CalendarProvider } from "@/lib/calendar/types";
 import { quickParse } from "@/lib/capture/quick-parse";
 import type { CaptureService } from "@/lib/capture/types";
+import { cloudCalendar } from "./calendar-store";
 import { cloudStore, useCloudData, useCloudSyncStatus } from "./cloud-store";
-
-// Google Calendar arrives in Phase 3; until then the list has no events.
-const noCalendar: CalendarProvider = {
-  async listEvents() {
-    return [];
-  },
-};
 
 // Until the AI parser arrives (Phase 4), typed text is understood on the
 // device by the same rule-based parser as the demo; it also works offline.
@@ -33,7 +26,7 @@ export const cloudBackend: Backend = {
   updateTask: cloudStore.updateTask,
   removeTasks: cloudStore.removeTasks,
   carryOver: cloudStore.carryOver,
-  calendar: noCalendar,
+  calendar: cloudCalendar,
   capture: localCapture,
   features: { voice: false, files: false },
 };

@@ -587,6 +587,10 @@ export const cloudStore = {
   getStatus(): SyncStatus {
     return status;
   },
+  /** Whose data is on screen: known from the device copy before the session check. */
+  getUserId(): string | null {
+    return state?.userId ?? null;
+  },
   toggleDone(id: string, day: string) {
     if (!state) return;
     const done = Boolean(state.view.done[doneKey(id, day)]);

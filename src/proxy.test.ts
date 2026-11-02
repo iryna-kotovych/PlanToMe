@@ -24,20 +24,41 @@ describe("proxy", () => {
     expect(response.headers.get("location")).toBe("https://planto-me.test/login");
   });
 
-  it("lets signed-out visitors open sign-in, the privacy policy and the auth callback", async () => {
+  it("lets signed-out visitors open sign-in, the privacy policy and the auth callbacks", async () => {
     const proxy = await loadProxy();
-    expect((await proxy(request("/login"))).headers.get("location")).toBeNull();
-    expect((await proxy(request("/privacy"))).headers.get("location")).toBeNull();
-    expect((await proxy(request("/auth/callback"))).headers.get("location")).toBeNull();
+    for (const path of [
+      "/login",
+      "/privacy",
+      "/auth/callback",
+      // Google Calendar: these check their own one-time state.
+      "/auth/connect/callback",
+      "/auth/connect/done",
+    ]) {
+      expect((await proxy(request(path))).headers.get("location")).toBeNull();
+    }
   });
 
   it("keeps every other page private, even ones named like public pages", async () => {
     const proxy = await loadProxy();
-    for (const path of ["/auth/connect", "/privacy-notes", "/login-help"]) {
+    for (const path of [
+      "/auth/connect",
+      "/auth/connect/callback/x",
+      "/auth/connect/donex",
+      "/privacy-notes",
+      "/login-help",
+    ]) {
       expect((await proxy(request(path))).headers.get("location")).toBe(
         "https://planto-me.test/login",
       );
     }
+  });
+
+  it("answers the app's own requests with 401 instead of the sign-in page", async () => {
+    const proxy = await loadProxy();
+    const response = await proxy(request("/api/calendar/sync"));
+    expect(response.status).toBe(401);
+    expect(response.headers.get("location")).toBeNull();
+    expect(await response.json()).toEqual({ error: "unauthorized" });
   });
 
   it("leaves the public demo open", async () => {

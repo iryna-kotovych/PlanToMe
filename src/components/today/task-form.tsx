@@ -103,6 +103,12 @@ export function TaskForm({
       setError("Pick a day.");
       return;
     }
+    // Typed dates skip the picker's minimum; a one-off task moved to a past
+    // day would just vanish from the list.
+    if (repeat === "none" && date < today && date !== task.date) {
+      setError("Pick today or a later day.");
+      return;
+    }
     if (time && endTime === time) {
       setError("The end time can't be the same as the start time.");
       return;

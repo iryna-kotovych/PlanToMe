@@ -48,10 +48,10 @@ Owner: Iryna Kotovych · Timezone: Europe/Madrid · Interface language: **Englis
   - Then timed items in chronological order, each showing its time (e.g. `09:30`) on the left. A time range is shown if the item has an end time.
 - Every item has a round checkbox. Checking it strikes the item through, softens its color and moves it to the bottom of the list (with a gentle animation). Unchecking restores it.
 - A small, quiet icon distinguishes the source: calendar event, task, habit (recurring). No colored tags, no clutter.
-- Tap an item → edit sheet (title, date, time, recurrence, note, attachment, delete).
+- Tap an item → edit sheet (title, date, time, recurrence, note, attachment, delete). A one-off task can't be moved to a past day (it would vanish from the list).
 - **Swipe right → next day.** Swipe back → previous day, but not earlier than today. Days are viewable up to 7 days ahead (today + 7). Tapping the date header jumps back to today. Small previous/next arrows beside the date do the same as swiping (for accessibility, and the arrow keys work on the Mac).
 - Calendar events open a read-only sheet: they can be checked off in the app, never edited.
-- Pull down to refresh (re-syncs Google Calendar).
+- Pull down from the top of the list to refresh (re-syncs Google Calendar); a small spinner shows while it runs, and a short message if it couldn't.
 - Empty day: one calm line of copy, no illustrations needed.
 
 ### 4.2 Add bar (fixed at the bottom)
@@ -82,21 +82,29 @@ Owner: Iryna Kotovych · Timezone: Europe/Madrid · Interface language: **Englis
 
 ### 5.1 Google Calendar sync (two-way, primary calendar only)
 
+**Connecting**
+- Until Google Calendar is connected, a quiet row at the top of the list says "See your Google Calendar events here" with **Connect**. If Google later stops accepting the connection (access removed, token expired), the row says "Google Calendar was disconnected" with **Reconnect**.
+- Connect goes through Google's consent screen and ends on a short result page with **Open PlanToMe**. It must be the same Google account the owner signs in with; another account is refused and its access given straight back.
+- The connection lives on the server, so connecting once (say, on the Mac) serves every device. The connect flow doesn't rely on cookies, so it also finishes when the iPhone's Home Screen app hands Google's page to another browser.
+
 **Calendar → app**
-- Fetch events of the owner's **primary** calendar for the days being viewed (today + the next few days, cached).
-- All-day events → untimed items. Timed events → timed items with start (and end) time.
+- Fetch events of the owner's **primary** calendar for today + 7 days (the days the list can show). Each device keeps a copy, so the calendar shows at once and offline.
+- All-day events → untimed items, on every day they cover. Timed events → timed items with start (and end) time; one that runs past midnight shows on its first day ("22:00 to 01:00"), and one longer than a day also shows as an untimed item on the following days.
 - Recurring calendar events are expanded into single instances.
-- Changes made in Google Calendar (edit, move, delete) show up in the app on next sync: on app open, on pull-to-refresh, and via a background sync job.
+- Hidden: events the owner declined, working-location events ("Home", "Office"), and the app's own events (their tasks are already in the list).
+- Changes made in Google Calendar (edit, move, delete) show up in the app on next sync: on app open, when coming back to the app after a minute or more, every 5 minutes while it is open, and on pull-to-refresh. A background job on the server comes with the reminders in Phase 5, which are what need it.
 - **Checking off a calendar event is local to the app only. The app never modifies or deletes events it did not create.**
 
 **App → calendar**
-- A task created in the app **with a time** is also created as an event in the primary calendar (default duration 30 min unless an end time/duration was given).
-- Editing, rescheduling or deleting that task in the app updates/deletes the matching event. The app stores the Google event ID to avoid duplicates and to recognise its own events when syncing back.
+- A one-off task **with a time**, dated today or later, is also created as an event in the primary calendar (default duration 30 min unless an end time was given). It is sent shortly after the change is saved, so changes made offline follow once they sync.
+- Editing, rescheduling or deleting that task in the app updates/deletes the matching event, as does removing its time or making it repeat. The server keeps each task's event ID (table `calendar_links`) to avoid duplicates and to recognise its own events when syncing back.
+- One-way for these events: an edit made to one in Google Calendar stays there until the task is changed in the app, and then the app's version wins. Deleting it in Google Calendar doesn't delete the task.
+- Events of past days are never changed or deleted.
 - Untimed tasks and habits are **not** written to the calendar.
 
 **OAuth notes**
 - Scope: `https://www.googleapis.com/auth/calendar.events` (minimum needed for read + write of events).
-- Refresh tokens are stored server-side only, encrypted, never sent to the browser.
+- Refresh tokens are stored server-side only, encrypted (AES-256-GCM, key in `TOKEN_ENCRYPTION_KEY`), never sent to the browser. Only the server, with the Supabase secret key, can read them.
 - ⚠️ A Google OAuth app left in "Testing" status issues refresh tokens that expire after 7 days. Set the consent screen to "In production" (unverified is fine for personal use; the owner sees the "Google hasn't verified this app" screen once).
 - Publishing needs the Branding page filled in: home page `https://planto-me.vercel.app`, privacy policy `https://planto-me.vercel.app/privacy`, authorised domains `planto-me.vercel.app` and the Supabase project domain (`<project-ref>.supabase.co`). No logo: uploading one makes Google require verification.
 
@@ -171,7 +179,7 @@ In the real app the database does the moving (`public.carry_over()`, once a day 
 - Timed tasks are stored as UTC instants; days and wall-clock times are computed in Europe/Madrid.
 - Row Level Security on every table. Only the allowed email can get an account at all (a "before user created" hook), and every policy also checks that email.
 - Optimistic UI: actions apply instantly and sync in the background; queue changes when offline and replay when back online.
-- Each device keeps a copy of the data, so the app opens instantly and works offline. It shows that copy at once and checks the session in the background (that check can take half a minute on a bad network). Changes from the other device arrive within seconds (Supabase Realtime) and on every app open.
+- Each device keeps a copy of the data, calendar events included, so the app opens instantly and works offline. It shows that copy at once and checks the session in the background (that check can take half a minute on a bad network). Changes from the other device arrive within seconds (Supabase Realtime) and on every app open.
 - No change is ever dropped. One the server refuses stays queued and is retried; check-offs stay when a task is deleted, so Undo brings them back.
 - A small status line appears only when something isn't synced yet: "Saving…", "Offline · changes are kept on this device", "Couldn't save · kept on this device" (with Retry), or "Signed out · changes are kept on this device" (with Sign in).
 - Sign out signs out this device only, and asks first if changes haven't been sent yet.
