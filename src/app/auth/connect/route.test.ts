@@ -13,10 +13,16 @@ const fake = vi.hoisted(() => {
       return { error: null };
     },
   };
-  return { state, client: { from: () => query }, owner: vi.fn() };
+  // The real app unless a test says otherwise (CI runs with the demo setting).
+  return { state, client: { from: () => query }, owner: vi.fn(), demo: false };
 });
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/env", () => ({
+  get DEMO_MODE() {
+    return fake.demo;
+  },
+}));
 vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: () => fake.client }));
 vi.mock("@/lib/supabase/owner", () => ({ signedInOwner: fake.owner }));
 
@@ -37,6 +43,14 @@ describe("Connect Google Calendar", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetAllMocks();
+    fake.demo = false;
+  });
+
+  it("doesn't exist in the public demo", async () => {
+    fake.demo = true;
+    const response = await GET(new NextRequest(new URL("/auth/connect", "https://planto-me.test")));
+    expect(response.status).toBe(404);
+    expect(fake.owner).not.toHaveBeenCalled();
   });
 
   it("sends anyone but the owner to sign in", async () => {

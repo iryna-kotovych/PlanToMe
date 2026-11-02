@@ -4,6 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   owner: vi.fn(),
   sync: vi.fn(),
+  // The real app unless a test says otherwise (CI runs with the demo setting).
+  demo: false,
+}));
+vi.mock("@/lib/env", () => ({
+  get DEMO_MODE() {
+    return mocks.demo;
+  },
 }));
 vi.mock("@/lib/supabase/owner", () => ({ signedInOwner: mocks.owner }));
 vi.mock("@/lib/calendar/sync", () => ({ syncCalendar: mocks.sync }));
@@ -20,7 +27,17 @@ function post(body: unknown) {
 }
 
 describe("/api/calendar/sync", () => {
-  afterEach(() => vi.resetAllMocks());
+  afterEach(() => {
+    vi.resetAllMocks();
+    mocks.demo = false;
+  });
+
+  it("doesn't exist in the public demo", async () => {
+    mocks.demo = true;
+    expect((await post({ pull: true })).status).toBe(404);
+    expect(mocks.owner).not.toHaveBeenCalled();
+    expect(mocks.sync).not.toHaveBeenCalled();
+  });
 
   it("is only for the signed-in owner", async () => {
     mocks.owner.mockResolvedValue(null);

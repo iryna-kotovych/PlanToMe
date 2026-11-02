@@ -9,6 +9,8 @@ const fake = vi.hoisted(() => {
     requests: [] as { state: string; user_id: string; created_at: string }[],
     tokens: [] as Record<string, unknown>[],
     ownerEmail: "Owner@example.com",
+    // The real app unless a test says otherwise (CI runs with the demo setting).
+    demo: false,
   };
   const client = {
     from(table: string) {
@@ -47,6 +49,11 @@ const fake = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/env", () => ({
+  get DEMO_MODE() {
+    return fake.state.demo;
+  },
+}));
 vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: () => fake.client }));
 
 const { GET } = await import("./route");
@@ -105,6 +112,16 @@ describe("Google Calendar callback", () => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     fetchMock.mockReset();
+    fake.state.demo = false;
+  });
+
+  it("doesn't exist in the public demo", async () => {
+    fake.state.demo = true;
+    tapped();
+    const url = new URL(`/auth/connect/callback?state=${STATE}&code=code-1`, "https://planto-me.test");
+    expect((await GET(new NextRequest(url))).status).toBe(404);
+    expect(fake.state.requests).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("saves the owner's calendar access, sealed", async () => {
