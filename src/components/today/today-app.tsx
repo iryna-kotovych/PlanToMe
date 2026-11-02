@@ -32,6 +32,7 @@ import { DemoBar } from "./demo-bar";
 import { DemoHint } from "./demo-hint";
 import { EventDetails } from "./event-details";
 import { Sheet } from "./sheet";
+import { PRIMARY_BUTTON } from "./styles";
 import { TaskForm } from "./task-form";
 import { Toast, type ToastData } from "./toast";
 
@@ -42,10 +43,31 @@ type SheetState = { type: "task"; id: string } | { type: "event"; id: string };
 export function TodayApp() {
   const today = useToday();
   const data = backend.useData();
+  const status = backend.useSyncStatus();
+  if (status === "elsewhere") return <OpenElsewhere />;
   if (today === null || data === null) {
     return <div className="h-dvh" aria-busy="true" />;
   }
   return <TodayScreen today={today} data={data} />;
+}
+
+/** Shown in a tab when a newer tab took over syncing. */
+function OpenElsewhere() {
+  return (
+    <main className="flex h-dvh flex-col items-center justify-center px-6 text-center">
+      <h1 className="text-xl font-semibold">PlanToMe is open in another tab</h1>
+      <p className="mt-2 text-base text-muted">
+        One tab at a time keeps your list in sync.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className={`${PRIMARY_BUTTON} mt-8 max-w-xs`}
+      >
+        Use it here
+      </button>
+    </main>
+  );
 }
 
 function whenLabel(task: Task, today: string): string {
@@ -218,6 +240,12 @@ function TodayScreen({ today, data }: { today: string; data: TaskData }) {
     });
   }
 
+  async function signOut() {
+    if ((await cloudStore.signOut()) === "failed") {
+      showToast({ message: "Couldn't sign out. Check your connection and try again." });
+    }
+  }
+
   function deleteTask(task: Task) {
     backend.removeTasks([task.id]);
     closeSheet();
@@ -246,7 +274,12 @@ function TodayScreen({ today, data }: { today: string; data: TaskData }) {
         {DEMO_MODE ? (
           <DemoBar onReset={resetDemo} />
         ) : (
-          <AccountBar status={syncStatus} onSignOut={() => void cloudStore.signOut()} />
+          <AccountBar
+            status={syncStatus}
+            onSignOut={() => void signOut()}
+            onSignIn={cloudStore.signIn}
+            onRetry={cloudStore.retry}
+          />
         )}
         <DayHeader
           day={day}

@@ -132,6 +132,7 @@ A single server-side "parser" turns input into structured tasks:
 Rules:
 - Resolve relative dates ("tomorrow", "on Friday", "завтра", "в п'ятницу") in Europe/Madrid.
 - **No day mentioned → today.** Time mentioned → timed task (and a calendar event).
+- An end time earlier than the start means the next morning ("22:00–01:00"); an end equal to the start is ignored.
 - Recurrence phrases ("every weekday", "каждый день", "щопонеділка") → recurring item.
 - Several tasks in one input → several items.
 - Keep task titles in the language the owner used; do not translate. All interface text stays English.
@@ -148,6 +149,8 @@ Rules:
 | Timed task (created in app) | 20:00 push → Wrap-up screen: Done / Move to tomorrow / Pick a day. If still undecided at midnight, it stays on its day and shows under "Needs a decision" on Today. Moving it also moves its calendar event. |
 | Calendar event (not created in app) | Nothing happens; it's an event, not a task. |
 | Habit / recurring item | Never carries over; it simply appears again on its next scheduled day. |
+
+In the real app the database does the moving (`public.carry_over()`, once a day per device, after that device's own changes are in), judged by the stored data. A device with an old copy can never bring back a task deleted on the other device or reopen one checked off there. The list shows carried tasks right away, offline too.
 
 ### 5.5 Recurring tasks & habits
 
@@ -168,8 +171,11 @@ Rules:
 - Timed tasks are stored as UTC instants; days and wall-clock times are computed in Europe/Madrid.
 - Row Level Security on every table. Only the allowed email can get an account at all (a "before user created" hook), and every policy also checks that email.
 - Optimistic UI: actions apply instantly and sync in the background; queue changes when offline and replay when back online.
-- Each device keeps a copy of the data, so the app opens instantly and works offline. Changes from the other device arrive within seconds (Supabase Realtime) and on every app open.
-- A small status line shows "Saving…" or "Offline · changes are kept on this device" only when something isn't synced yet.
+- Each device keeps a copy of the data, so the app opens instantly and works offline. It shows that copy at once and checks the session in the background (that check can take half a minute on a bad network). Changes from the other device arrive within seconds (Supabase Realtime) and on every app open.
+- No change is ever dropped. One the server refuses stays queued and is retried; check-offs stay when a task is deleted, so Undo brings them back.
+- A small status line appears only when something isn't synced yet: "Saving…", "Offline · changes are kept on this device", "Couldn't save · kept on this device" (with Retry), or "Signed out · changes are kept on this device" (with Sign in).
+- Sign out signs out this device only, and asks first if changes haven't been sent yet.
+- On a computer one tab at a time syncs: opening another tab pauses the first, which offers "Use it here".
 
 ---
 
@@ -181,6 +187,7 @@ Rules:
 - Seeds, fixtures, tests and screenshots use invented data only.
 - **Production app:** sign-in with Google, restricted to a single allowed email (`ALLOWED_EMAIL` env var). Anyone else is rejected server-side.
 - AI and Google API calls happen only on the server.
+- Preview deployments of the real app (e.g. from Dependabot pull requests) build in demo mode, so they never touch real services.
 - A public privacy policy at `/privacy`, linked from the sign-in page and from Google's consent screen. Keep it true whenever the app starts using data in a new way (new provider, new kind of data).
 
 ## 7. Public demo

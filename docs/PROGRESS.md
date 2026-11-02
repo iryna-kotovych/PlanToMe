@@ -15,8 +15,23 @@
 - Owner tests the demo on iPhone and gives feedback.
 - **Phase 2 — Real app:**
   - Done in code: Supabase schema with Row Level Security on every table, sign-in with Google for the one allowed account (checked by the server, a sign-up hook and every table policy), tasks and check-offs synced between devices with an offline queue, public privacy policy at `/privacy`.
-  - Done in services: Supabase project (EU), Vercel project `planto-me` with its settings.
-  - Waiting for: Google Cloud sign-in keys (owner), then switch on Google sign-in in Supabase, deploy, and test on iPhone and Mac.
+  - Done in services: Supabase project (EU), Vercel project `planto-me`, Google sign-in (consent screen published), live at https://planto-me.vercel.app.
+  - QA pass (Nov 2): live site, database access as a stranger and as the owner, and shipped code for secrets all checked. An independent code review found data-loss risks in sync, all fixed:
+    - carry-over now runs in the database;
+    - refused changes are kept and shown;
+    - the app opens from the device copy offline;
+    - sign out affects this device only and warns about unsent changes;
+    - one tab at a time;
+    - overnight time ranges;
+    - Undo keeps check-offs.
+  - Tests: 76 unit tests, including 13 for the sync store against an in-memory fake Supabase; 17 iPhone e2e tests.
+  - Waiting for: owner signs in and runs the iPhone + Mac checklist.
+
+## Known limits
+
+- Until the evening wrap-up (Phase 5), an unfinished **timed** task stays on its day and disappears from view the next day.
+- The free Supabase project pauses after 7 days without use. Supabase emails first; restore it from the dashboard.
+- Only the last 30 days of one-off tasks and check-offs are loaded.
 
 ## Next
 

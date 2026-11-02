@@ -2,8 +2,19 @@ import type { CalendarProvider } from "@/lib/calendar/types";
 import type { CaptureService } from "@/lib/capture/types";
 import type { Task, TaskData } from "@/lib/types";
 
-/** "offline": changes are kept on this device and sent when back online. */
-export type SyncStatus = "synced" | "saving" | "offline";
+/**
+ * - "offline": changes are kept on this device and sent when back online.
+ * - "stuck": the server refused a change; it stays queued and is retried.
+ * - "signedOut": the session ended; changes wait until signing in again.
+ * - "elsewhere": another tab took over (one tab at a time syncs).
+ */
+export type SyncStatus =
+  | "synced"
+  | "saving"
+  | "offline"
+  | "stuck"
+  | "signedOut"
+  | "elsewhere";
 
 /**
  * Where the day list's data lives: the visitor's browser in the public demo,
