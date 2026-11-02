@@ -23,6 +23,10 @@ const fake = vi.hoisted(() => {
     sessionGate: null as Promise<void> | null,
     /** Each read waits for the next gate, if any, after taking its snapshot. */
     readGates: [] as Promise<void>[],
+    /** Each write waits for the next gate, if any. */
+    writeGates: [] as Promise<void>[],
+    /** When set, signing out waits for it. */
+    signOutGate: null as Promise<void> | null,
     /** The database's own "today" in Europe/Madrid. */
     today: "",
     carryOverCalls: 0,
@@ -53,7 +57,7 @@ const fake = vi.hoisted(() => {
   }
 
   async function write(query: Query): Promise<Answer> {
-    await Promise.resolve();
+    await (server.writeGates.shift() ?? Promise.resolve());
     if (!server.online) return offline;
     if (server.unauthorized) return unauthorized;
     const { row, filters } = query;
@@ -104,14 +108,18 @@ const fake = vi.hoisted(() => {
     let moved = 0;
     for (const row of server.tasks.values()) {
       const date = String(row.date);
-      const checkedOff = server.completions.has(`${String(row.id)}|${date}`);
+      // Checked off on its day or any later past day.
+      const checkedOff = [...server.completions].some((key) => {
+        const [itemId, day = ""] = key.split("|");
+        return itemId === String(row.id) && day >= date && day < server.today;
+      });
       if (date < server.today && !row.recurrence && !row.starts_at && !checkedOff) {
         row.carried_from = row.carried_from ?? date;
         row.date = server.today;
         moved += 1;
       }
     }
-    return { data: moved, error: null, status: 200 };
+    return { data: { moved, day: server.today }, error: null, status: 200 };
   }
 
   // Shaped like the library's own AuthRetryableFetchError.
@@ -137,6 +145,7 @@ const fake = vi.hoisted(() => {
         };
       },
       async signOut(options: unknown) {
+        if (server.signOutGate) await server.signOutGate;
         server.signOutCalls.push(options);
         server.session = "none";
         server.authListeners.forEach((listener) => listener("SIGNED_OUT"));
@@ -171,6 +180,8 @@ const fake = vi.hoisted(() => {
     server.session = "ok";
     server.sessionGate = null;
     server.readGates.length = 0;
+    server.writeGates.length = 0;
+    server.signOutGate = null;
     server.today = "";
     server.carryOverCalls = 0;
     server.signOutCalls.length = 0;
@@ -227,6 +238,8 @@ function installBrowser({ locks }: { locks?: ReturnType<typeof fakeLocks> } = {}
     online: true,
     confirmAnswer: true,
     assigned: [] as string[],
+    /** Fires a window or document event, e.g. "online" or "visibilitychange". */
+    fire: (type: string) => handlers.get(type)?.forEach((handler) => handler()),
   };
   const listen = (type: string, handler: () => void) => {
     const set = handlers.get(type) ?? new Set();
@@ -345,6 +358,36 @@ describe("cloud store", () => {
       expect(browser.assigned).toEqual(["/login"]);
     });
 
+    it("downloads again after a failed download, with nothing waiting to send", async () => {
+      fake.server.tasks.set("a", { ...taskToRow(task("a", TODAY)) });
+      // The phone says it is online, but the first download gets no answer.
+      fake.server.online = false;
+      const store = await openApp();
+      await settle();
+      expect(store.getStatus()).toBe("offline");
+
+      fake.server.online = true;
+      await settle(30_000);
+      expect(store.getStatus()).toBe("synced");
+      expect(ids(store.getData())).toEqual(["a"]);
+    });
+
+    it("reconnects as soon as the library gets the session back", async () => {
+      saveOnDevice(browser, {});
+      fake.server.session = "unreachable";
+      fake.server.online = false;
+      const store = await openApp();
+      await settle();
+      expect(store.getStatus()).toBe("offline");
+
+      fake.server.session = "ok";
+      fake.server.online = true;
+      fake.server.authListeners.forEach((listener) => listener("TOKEN_REFRESHED"));
+      // Well before the 30-second retry.
+      await settle(1);
+      expect(store.getStatus()).toBe("synced");
+    });
+
     it("keeps the valid saved changes when one can't be read", async () => {
       saveOnDevice(browser, {
         pending: [
@@ -405,6 +448,66 @@ describe("cloud store", () => {
       await settle();
       expect(fake.server.carryOverCalls).toBe(1);
     });
+
+    it("keeps a carried task done when it was checked off offline", async () => {
+      // Open on Nov 1. On Nov 2 the phone is offline all day: the task shows
+      // on Nov 2 and is checked off there, but the database never moved it.
+      vi.setSystemTime(new Date("2026-11-02T10:00:00Z"));
+      saveOnDevice(browser, { tasks: [task("a", "2026-11-01")] });
+      fake.server.tasks.set("a", { ...taskToRow(task("a", "2026-11-01")) });
+      fake.server.online = false;
+      browser.online = false;
+      const store = await openApp();
+      await settle();
+      store.carryOver("2026-11-02");
+      store.toggleDone("a", "2026-11-02");
+      await settle();
+
+      // Nov 3, back online.
+      vi.setSystemTime(new Date("2026-11-03T10:00:00Z"));
+      fake.server.today = "2026-11-03";
+      fake.server.online = true;
+      browser.online = true;
+      store.carryOver("2026-11-03");
+      await settle();
+      expect(fake.server.completions.has("a|2026-11-02")).toBe(true);
+      expect(fake.server.tasks.get("a")?.date).toBe("2026-11-01");
+      expect(store.getData()?.tasks[0]?.date).toBe("2026-11-01");
+    });
+
+    it("catches up on the day's carry-over once waiting changes are sent", async () => {
+      fake.server.tasks.set("a", { ...taskToRow(task("a", YESTERDAY)) });
+      const store = await openApp();
+      await settle();
+      const slow = gate();
+      fake.server.writeGates.push(slow.promise);
+      store.addTasks([task("b", TODAY)]);
+      // The new day starts while that change is on its way.
+      store.carryOver(TODAY);
+      await settle();
+      expect(fake.server.carryOverCalls).toBe(0);
+
+      slow.open();
+      await settle(500);
+      expect(fake.server.carryOverCalls).toBe(1);
+      expect(fake.server.tasks.get("a")?.date).toBe(TODAY);
+    });
+
+    it("asks again shortly when the database's day is still yesterday", async () => {
+      fake.server.tasks.set("a", { ...taskToRow(task("a", "2026-10-31")) });
+      // The database's clock is a few seconds behind at midnight.
+      fake.server.today = YESTERDAY;
+      const store = await openApp();
+      await settle();
+      store.carryOver(TODAY);
+      await settle();
+      expect(fake.server.carryOverCalls).toBe(1);
+
+      fake.server.today = TODAY;
+      await settle(30_000);
+      expect(fake.server.carryOverCalls).toBe(2);
+      expect(fake.server.tasks.get("a")?.date).toBe(TODAY);
+    });
   });
 
   describe("changes", () => {
@@ -423,6 +526,19 @@ describe("cloud store", () => {
       await settle();
       expect(store.getStatus()).toBe("synced");
       expect(fake.server.tasks.has("a")).toBe(true);
+    });
+
+    it("sends the newer version at once when a refused change was replaced", async () => {
+      fake.server.refuse = (row) => row.title === "Refused";
+      const store = await openApp();
+      await settle();
+      const refused = task("a", TODAY, { title: "Refused" });
+      store.addTasks([refused]);
+      // Edited again while the first version is on its way.
+      store.updateTask({ ...refused, title: "Fixed" });
+      await settle();
+      expect(store.getStatus()).toBe("synced");
+      expect(fake.server.tasks.get("a")?.title).toBe("Fixed");
     });
 
     it("waits offline and sends everything when the network is back", async () => {
@@ -477,6 +593,51 @@ describe("cloud store", () => {
 
       store.signIn();
       expect(browser.assigned).toEqual(["/login"]);
+    });
+
+    it("stays on 'Signed out' when the app comes back or a retry fires", async () => {
+      const store = await openApp();
+      await settle();
+      fake.server.unauthorized = true;
+      fake.server.session = "none";
+      store.addTasks([task("a", TODAY)]);
+      await settle();
+      expect(store.getStatus()).toBe("signedOut");
+
+      browser.fire("visibilitychange");
+      await settle(5 * 60_000);
+      expect(store.getStatus()).toBe("signedOut");
+      expect(browser.assigned).toEqual([]);
+    });
+
+    it("keeps 'Signed out' when a download lands afterwards", async () => {
+      const store = await openApp();
+      await settle();
+      const slow = gate();
+      fake.server.readGates.push(slow.promise, slow.promise);
+      fake.server.realtime[0]?.();
+      await settle(500);
+      fake.server.session = "none";
+      fake.server.authListeners.forEach((listener) => listener("SIGNED_OUT"));
+      await settle();
+      expect(store.getStatus()).toBe("signedOut");
+
+      slow.open();
+      await settle();
+      expect(store.getStatus()).toBe("signedOut");
+    });
+
+    it("takes no new change while signing out", async () => {
+      const store = await openApp();
+      await settle();
+      const slow = gate();
+      fake.server.signOutGate = slow.promise;
+      const result = store.signOut();
+      store.addTasks([task("a", TODAY)]);
+      expect(ids(store.getData())).toEqual([]);
+
+      slow.open();
+      expect(await result).toBe("signedOut");
     });
 
     it("signs out of this device only, and asks before losing unsent changes", async () => {

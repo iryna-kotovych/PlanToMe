@@ -35,6 +35,13 @@ describe("carryOver", () => {
     expect(moved?.carriedFrom).toBe("2026-10-30");
   });
 
+  it("counts a check-off made on a later day the task was carried to", () => {
+    // Shown on Nov 1 while offline and checked off there, never moved for real.
+    const tasks = [task("errand")];
+    const done = { [doneKey("errand", "2026-11-01")]: true } as const;
+    expect(carryOver(tasks, done, TODAY)).toBe(tasks);
+  });
+
   it("leaves timed, recurring, finished and upcoming tasks alone", () => {
     const tasks = [
       task("timed", { time: "15:00" }),

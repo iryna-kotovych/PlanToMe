@@ -40,6 +40,8 @@ const MutationSchema = z.discriminatedUnion("type", [
 
 const DoneSchema = z.record(z.string(), z.literal(true));
 const CompletionRowSchema = z.object({ item_id: z.string(), day: z.string() });
+/** What public.carry_over() answers: how many moved, and its own today. */
+const CarryOverResultSchema = z.object({ moved: z.number(), day: z.string() });
 
 /** Why changes are waiting, if anything is wrong. */
 type Problem = "offline" | "refused" | "signedOut" | null;
@@ -77,6 +79,9 @@ let pullCount = 0;
 let appliedPull = 0;
 /** The day the database last carried tasks over, from this tab. */
 let carriedOn: string | null = null;
+let carrying = false;
+/** Sign-out is under way: the queue is about to be cleared. */
+let signingOut = false;
 let pullTimer: number | undefined;
 let retryTimer: number | undefined;
 let channel: RealtimeChannel | null = null;
@@ -246,22 +251,30 @@ async function setback(result: Exclude<SendResult, "sent">) {
   }
 }
 
-async function flush() {
-  if (!state || !signedInAs || flushing || takenOver) return;
+type FlushResult = "done" | "busy" | Exclude<SendResult, "sent">;
+
+/** Sends the queue in order; says what stopped it, if anything did. */
+async function flush(): Promise<FlushResult> {
+  if (!state || !signedInAs || takenOver) return "done";
+  if (flushing) return "busy";
   flushing = true;
+  let sentAny = false;
   try {
     while (state && signedInAs && !takenOver) {
       const mutation = state.pending[0];
       if (!mutation) break;
       const result = await send(mutation);
-      if (!state) return;
+      if (!state) return "done";
+      // Replaced while on its way (edited again): the newer version is next.
+      if (result === "refused" && state.pending[0] !== mutation) continue;
       if (result !== "sent") {
         await setback(result);
-        return;
+        return result;
       }
       sentCount += 1;
+      sentAny = true;
       update({
-        problem: null,
+        problem: signedInAs ? null : state.problem,
         server: applyMutation(state.server, mutation),
         // A newer change to the same thing may already have replaced it.
         pending: state.pending.filter((queued) => queued !== mutation),
@@ -270,6 +283,9 @@ async function flush() {
   } finally {
     flushing = false;
   }
+  // The day's carry-over waits for an empty queue: catch up now that it is.
+  if (sentAny && state?.pending.length === 0) void catchUpCarryOver();
+  return "done";
 }
 
 async function pull() {
@@ -285,7 +301,8 @@ async function pull() {
       .or(`date.gte.${since},recurrence.not.is.null`),
     supabase.from("completions").select("item_id,day").gte("day", since),
   ]);
-  if (!state || takenOver) return;
+  // Signed out meanwhile: keep showing that, not a fresh "synced".
+  if (!state || takenOver || !signedInAs) return;
   if (tasks.error || completions.error) {
     const failedStatus = tasks.error ? tasks.status : completions.status;
     if (failure(failedStatus) === "unauthorized") {
@@ -324,22 +341,40 @@ async function pull() {
 /**
  * Asks the database to carry unfinished tasks over, once a day and only
  * after this device's own changes are in (a check-off made offline counts).
+ * Says whether anything moved.
  */
-async function runCarryOver() {
+async function runCarryOver(): Promise<boolean> {
   const today = state?.today;
-  if (!today || carriedOn === today) return;
-  const { data, error } = await supabaseBrowser().rpc("carry_over");
-  // Not urgent: the list already shows them, and the next sync tries again.
-  if (error) return;
-  carriedOn = today;
-  // The server changed: a download already on its way must not win.
-  if (typeof data === "number" && data > 0) sentCount += 1;
+  if (!today || carriedOn === today || carrying || !signedInAs) return false;
+  carrying = true;
+  try {
+    const { data, error } = await supabaseBrowser().rpc("carry_over");
+    const result = CarryOverResultSchema.safeParse(data);
+    // Not urgent: the list already shows them, and the next sync tries again.
+    if (error || !result.success) return false;
+    // The database's clock decides. Just after midnight it may still be
+    // yesterday there, so ask again shortly.
+    carriedOn = result.data.day;
+    if (result.data.day < today) scheduleRetry(RETRY_MS);
+    if (result.data.moved === 0) return false;
+    // The server changed: a download already on its way must not win.
+    sentCount += 1;
+    return true;
+  } finally {
+    carrying = false;
+  }
+}
+
+async function catchUpCarryOver() {
+  if (await runCarryOver()) schedulePull();
 }
 
 async function sync() {
   if (!signedInAs || takenOver) return;
-  await flush();
-  if (!state || state.problem === "offline" || state.problem === "signedOut") return;
+  const flushed = await flush();
+  // Only a failure in this very attempt stops here: a leftover "offline"
+  // from an earlier one must not keep the list from downloading.
+  if (!state || !signedInAs || flushed === "offline" || flushed === "unauthorized") return;
   if (state.pending.length === 0) await runCarryOver();
   await pull();
 }
@@ -376,6 +411,7 @@ async function recheckSession() {
 /** The session ended: changes stay on this device until signing in again. */
 function signedOut() {
   signedInAs = null;
+  window.clearTimeout(retryTimer);
   stopRealtime();
   update({ problem: "signedOut" });
 }
@@ -412,8 +448,9 @@ async function connect() {
       return;
     }
     if (session === "none") {
-      // Waiting changes stay on the device and go out after signing in.
-      if (state && !navigator.onLine) update({ problem: "signedOut" });
+      // With a list to show, stay on it and offer Sign in (waiting changes
+      // go out after signing in); with nothing to show, go to sign-in.
+      if (state?.ready) signedOut();
       else goToLogin();
       return;
     }
@@ -473,9 +510,15 @@ function watchConnection() {
   window.addEventListener("offline", onOffline);
   document.addEventListener("visibilitychange", onVisible);
   const { data } = supabaseBrowser().auth.onAuthStateChange((event) => {
-    if (event !== "SIGNED_OUT") return;
-    sessionEnded = true;
-    if (signedInAs) signedOut();
+    if (event === "SIGNED_OUT") {
+      sessionEnded = true;
+      if (signedInAs) signedOut();
+    } else if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && !signedInAs) {
+      // The library has the session back (say, the network returned): no
+      // need to wait for the next retry. Deferred, because calling Supabase
+      // from inside this callback can deadlock.
+      window.setTimeout(() => void connect(), 0);
+    }
   });
   cleanups.push(() => {
     window.removeEventListener("online", onOnline);
@@ -508,7 +551,7 @@ function subscribe(listener: () => void) {
 }
 
 function mutate(mutation: Mutation) {
-  if (!state || takenOver) return;
+  if (!state || takenOver || signingOut) return;
   update({ pending: enqueue(state.pending, mutation) });
   void flush();
 }
@@ -586,11 +629,16 @@ export const cloudStore = {
         return "cancelled";
       }
     }
+    // From here no new change is taken: the queue is about to be cleared.
+    signingOut = true;
     sessionEnded = false;
     const { error } = await supabaseBrowser().auth.signOut({ scope: "local" });
     // With no network and an expired session the library can't sign out and
     // keeps the session; otherwise it removes it even if the server call failed.
-    if (error && !sessionEnded) return "failed";
+    if (error && !sessionEnded) {
+      signingOut = false;
+      return "failed";
+    }
     stopWork();
     releaseTabLock?.();
     state = null;

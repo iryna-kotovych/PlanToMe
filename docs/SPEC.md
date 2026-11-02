@@ -150,7 +150,7 @@ Rules:
 | Calendar event (not created in app) | Nothing happens; it's an event, not a task. |
 | Habit / recurring item | Never carries over; it simply appears again on its next scheduled day. |
 
-In the real app the database does the moving (`public.carry_over()`, once a day per device, after that device's own changes are in), judged by the stored data. A device with an old copy can never bring back a task deleted on the other device or reopen one checked off there. The list shows carried tasks right away, offline too.
+In the real app the database does the moving (`public.carry_over()`, once a day per device, after that device's own changes are in), judged by the stored data. A device with an old copy can never bring back a task deleted on the other device or reopen one checked off there. The list shows carried tasks right away, offline too. A check-off on the task's day or any later past day counts as done: offline, a carried task shows (and gets checked off) on the new day before the database has moved it.
 
 ### 5.5 Recurring tasks & habits
 

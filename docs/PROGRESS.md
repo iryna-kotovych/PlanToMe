@@ -24,7 +24,8 @@
     - one tab at a time;
     - overnight time ranges;
     - Undo keeps check-offs.
-  - Tests: 76 unit tests, including 13 for the sync store against an in-memory fake Supabase; 17 iPhone e2e tests.
+  - A second independent review of the rewritten sync found 8 more issues; all fixed, each with a test that fails on the old code.
+  - Tests: 86 unit tests, including 22 for the sync store against an in-memory fake Supabase; 17 iPhone e2e tests.
   - Waiting for: owner signs in and runs the iPhone + Mac checklist.
 
 ## Known limits
