@@ -57,7 +57,7 @@ Owner: Iryna Kotovych · Timezone: Europe/Madrid · Interface language: **Englis
 ### 4.2 Add bar (fixed at the bottom)
 
 - **Mic button:** tap to start recording, tap again to stop (also support press-and-hold). Shows a live recording indicator and timer.
-- Text field: type a task in natural language ("call the bank tomorrow at 3pm").
+- Text field: type a task in natural language ("call the bank tomorrow at 3pm"). The iPhone keyboard's dictation works here too. Until the AI parser arrives (Phase 4), the real app understands typed text on the device with the demo's rule-based parser (section 7).
 - Attach button: camera, photo library, or file (images, PDF).
 - After capture, the item is added immediately and an **Undo / Edit** toast appears for a few seconds. If parsing produced several tasks, all are added and the toast says how many.
 
@@ -205,6 +205,9 @@ In the real app the database does the moving (`public.carry_over()`, once a day 
 - No sign-in, no real Google account, no real keys. Uses a mock calendar and sample tasks; data is kept in the visitor's browser and can be reset.
 - Voice and image input in the demo run against canned example results (so the owner's free quotas and keys can't be abused). The demo never asks for the microphone.
 - Typed text in the demo is understood by a small built-in rule-based parser (days, times and repeats in English, Russian and Ukrainian), so it needs no AI.
+  - Times can be digits ("15:00", "3pm") or words, as the keyboard's dictation types them: "в 15 часов", "в 3 часа дня", "о 15 годині", "о третій", "at 7 in the evening", "в полдень".
+  - A number is a time only after "в/о/at" and with an hour word or a part of the day after it, or as a Ukrainian ordinal ("о третій"). So "поспать 3 часа" stays the title.
+  - Without a part of the day, 1 to 6 o'clock means the afternoon ("в 3 часа" is 15:00) and 7 to 12 is taken as said. A clock time such as "3:30" is always taken as written.
 - A small "Demo — sample data" label.
 - First-time visitors see a short, dismissible tip: swipe for the coming days, type a task, try the mic and the paperclip. Once dismissed it stays hidden in that browser.
 

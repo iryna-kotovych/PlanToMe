@@ -36,6 +36,7 @@
   - Nov 3: redirect address added in Google Cloud; the owner connected the calendar, and the first syncs went through without errors.
   - Privacy check (Nov 3): no leaks found; two small fixes.
   - Waiting for: the owner's calendar checklist.
+- **Dictation** (Nov 3): typed text understands times in words ("в 15 часов", "в 3 часа дня", "о 15 годині", "о третій", "at 7 in the evening"). So the iPhone keyboard's mic can add tasks until the app's own mic arrives in Phase 4. Tests: 172 unit tests, 23 iPhone e2e tests.
 
 ## Known limits
 
@@ -64,4 +65,5 @@
 - Real app address: https://planto-me.vercel.app (`plantome.vercel.app` was taken).
 - Google sign-in app is published "In production" without Google's verification, so calendar access doesn't expire every 7 days. No logo on the consent screen: a logo would require verification.
 - Task events in Google Calendar are private (owner's choice, Nov 3): people who can see her calendar see only "busy".
+- An hour said without a part of the day (engineer's default, Nov 3): 1 to 6 o'clock means the afternoon ("в 3 часа" is 15:00), 7 to 12 is taken as said. Clock times like "3:30" are taken as written.
 - The token encryption key exists only in Vercel and can't be read back. Replacing it costs one Reconnect: the stored calendar access no longer opens, so the app asks to connect again.

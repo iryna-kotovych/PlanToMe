@@ -118,4 +118,70 @@ describe("quickParse", () => {
   it("ignores impossible times", () => {
     expect(parseOne("meet at 25:00")).toMatchObject({ time: null });
   });
+
+  it("understands times in words, as the keyboard's dictation types them", () => {
+    expect(parseOne("Позвонить в банк завтра в 3 часа дня.")).toMatchObject({
+      title: "Позвонить в банк",
+      date: "2026-10-31",
+      time: "15:00",
+    });
+    expect(parseOne("подзвонити мамі о 15 годині")).toMatchObject({
+      title: "Подзвонити мамі",
+      time: "15:00",
+    });
+    expect(parseOne("Call the bank at 3 p.m.")).toMatchObject({
+      title: "Call the bank",
+      time: "15:00",
+    });
+  });
+
+  it("reads hours, minutes and the part of the day in words", () => {
+    const times: [string, string][] = [
+      ["созвон в 15 часов", "15:00"],
+      ["созвон в 15 часов 30 минут", "15:30"],
+      ["созвон в 3:30 дня", "15:30"],
+      ["встреча в 10 утра", "10:00"],
+      ["ужин в семь вечера", "19:00"],
+      ["вынести мусор в 11 ночи", "23:00"],
+      ["рейс в 2 часа ночи", "02:00"],
+      ["обед в час дня", "13:00"],
+      ["зустріч о третій дня", "15:00"],
+      ["пробіжка о восьмій ранку", "08:00"],
+      ["зустріч о 15-й годині", "15:00"],
+      ["tea at three o'clock", "15:00"],
+      ["call Marta at 7 in the evening", "19:00"],
+      ["обед в полдень", "12:00"],
+      ["обід опівдні", "12:00"],
+      ["lunch at noon", "12:00"],
+    ];
+    for (const [text, time] of times) {
+      expect(parseOne(text).time, text).toBe(time);
+    }
+  });
+
+  it("takes 1 to 6 o'clock as the afternoon unless the part of the day is said", () => {
+    expect(parseOne("забрать посылку в 3 часа").time).toBe("15:00");
+    expect(parseOne("зустріч о шостій").time).toBe("18:00");
+    expect(parseOne("пробежка в 6 утра").time).toBe("06:00");
+    expect(parseOne("встреча в 8 часов").time).toBe("08:00");
+    expect(parseOne("обед в 12 часов").time).toBe("12:00");
+    // A clock time is taken as written.
+    expect(parseOne("рейс в 3:30").time).toBe("03:30");
+  });
+
+  it("does not mistake a length of time or a count for a time", () => {
+    for (const text of [
+      "поспать 3 часа",
+      "отпуск на 3 дня",
+      "через 3 дня позвонить",
+      "не ехать в час пик",
+      "читати 2 години",
+      "в три раза больше воды",
+    ]) {
+      expect(parseOne(text), text).toMatchObject({
+        title: text.charAt(0).toLocaleUpperCase() + text.slice(1),
+        time: null,
+      });
+    }
+  });
 });

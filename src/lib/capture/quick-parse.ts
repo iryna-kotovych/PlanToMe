@@ -4,8 +4,9 @@ import type { Recurrence } from "@/lib/types";
 import type { ParsedTask } from "./types";
 
 // A small rule-based parser for the public demo, which never calls an AI
-// service. It understands common English, Russian and Ukrainian phrases for
-// days, times and repeats; everything left over becomes the title.
+// service, and for typed text in the real app until the AI parser arrives. It
+// understands common English, Russian and Ukrainian phrases for days, times
+// and repeats; everything left over becomes the title.
 
 const NOT_LETTER_BEFORE = "(?<![\\p{L}\\p{N}])";
 const NOT_LETTER_AFTER = "(?![\\p{L}\\p{N}])";
@@ -67,10 +68,69 @@ const RANGE = new RegExp(
   "iu",
 );
 const MERIDIEM = new RegExp(
-  `${TIME_PREFIX}(\\d{1,2})(?:[:.](\\d{2}))?\\s*(am|pm)${NOT_LETTER_AFTER}`,
+  `${TIME_PREFIX}(\\d{1,2})(?:[:.](\\d{2}))?\\s*([ap])\\.?m\\.?${NOT_LETTER_AFTER}`,
   "iu",
 );
 const CLOCK = new RegExp(`${TIME_PREFIX}(\\d{1,2})[:.](\\d{2})(?!\\d)`, "iu");
+const NOON = phrase("(?:(?:at|в|о)\\s+)?(?:noon|midday|полдень|полудні)|опівдні");
+
+// Times in words, as the keyboard's dictation types them: "в 15 часов",
+// "в 3 часа дня", "о 15 годині", "о третій", "at 7 in the evening". A number on
+// its own isn't a time ("поспать 3 часа", "на 3 дня"): it needs "в/о/at" before
+// it and an hour word or a part of the day after it, unless it is a Ukrainian
+// ordinal, which always names the hour.
+
+// 1 to 12 in words.
+const HOUR_NUMBERS: [number, string][] = [
+  // "в час дня" is 1 p.m.
+  [1, "one|час|першій"],
+  [2, "two|два|другій"],
+  [3, "three|три|третій"],
+  [4, "four|четыре|четвертій"],
+  [5, `five|пять|п${APOSTROPHE}ятій`],
+  [6, "six|шесть|шостій"],
+  [7, "seven|семь|сьомій"],
+  [8, "eight|восемь|восьмій"],
+  [9, `nine|девять|дев${APOSTROPHE}ятій`],
+  [10, "ten|десять|десятій"],
+  [11, "eleven|одиннадцать|одинадцятій"],
+  [12, "twelve|двенадцать|дванадцятій"],
+];
+
+type DayPart = "morning" | "afternoon" | "evening" | "night";
+
+const DAY_PARTS: [DayPart, string][] = [
+  ["morning", "утра|ранку|in\\s+the\\s+morning|a\\.?m\\.?"],
+  ["afternoon", "дня|in\\s+the\\s+afternoon|p\\.?m\\.?"],
+  ["evening", "вечера|вечора|in\\s+the\\s+evening"],
+  ["night", "ночи|ночі|at\\s+night"],
+];
+
+const HOUR_UNIT = "часов|часа|час|ч|годині|години|година|годину|год|o['’]?\\s?clock";
+const MINUTE_UNIT =
+  "минуты|минута|минут|мин|хвилини|хвилина|хвилин|хв|minutes|minute|min";
+
+function anyOf(table: [unknown, string][]): string {
+  return table.map(([, forms]) => forms).join("|");
+}
+
+function wholeWords<T>(table: [T, string][]): (readonly [T, RegExp])[] {
+  return table.map(
+    ([value, forms]) => [value, new RegExp(`^(?:${forms})$`, "iu")] as const,
+  );
+}
+
+const SPOKEN = new RegExp(
+  `${NOT_LETTER_BEFORE}(?:at|from|в|во|о|об|с|з|від)\\s+` +
+    `(?:(?<digits>\\d{1,2})(?:[:.](?<clockMinutes>\\d{2}))?(?:-?(?<ordinal>й|ій))?` +
+    `|(?<word>${anyOf(HOUR_NUMBERS)}))` +
+    `(?:\\s*(?<unit>${HOUR_UNIT})\\.?${NOT_LETTER_AFTER})?` +
+    `(?:\\s+(?<minutes>\\d{1,2})\\s*(?:${MINUTE_UNIT})\\.?${NOT_LETTER_AFTER})?` +
+    `(?:\\s+(?<part>${anyOf(DAY_PARTS)})${NOT_LETTER_AFTER})?${NOT_LETTER_AFTER}`,
+  "giu",
+);
+const HOUR_WORDS = wholeWords(HOUR_NUMBERS);
+const DAY_PART_WORDS = wholeWords(DAY_PARTS);
 
 const DANGLING_WORD = /\s+(?:at|on|in|в|во|у|о|об|на)$/iu;
 
@@ -79,22 +139,74 @@ function clock(hours: number, minutes: number): string | null {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function meridiem(hours: number, minutes: number, half: string): string | null {
+function meridiem(hours: number, minutes: number, isPm: boolean): string | null {
   if (hours < 1 || hours > 12) return null;
-  const isPm = half.toLowerCase() === "pm";
   return clock((hours % 12) + (isPm ? 12 : 0), minutes);
+}
+
+function lookUp<T>(table: (readonly [T, RegExp])[], text: string): T | undefined {
+  return table.find(([, pattern]) => pattern.test(text))?.[0];
+}
+
+function isSpokenTime(match: RegExpExecArray): boolean {
+  const { ordinal, word, unit, part } = match.groups ?? {};
+  return Boolean(unit || part || ordinal || word?.toLowerCase().endsWith("ій"));
+}
+
+/**
+ * The time a SPOKEN match names. Without a part of the day, 1 to 6 o'clock is
+ * the afternoon ("в 3 часа" is 15:00) and 7 to 12 is taken as said.
+ */
+function spokenTime(match: RegExpExecArray): string | null {
+  const { digits, clockMinutes, minutes, word, part } = match.groups ?? {};
+  const hours = digits ? Number(digits) : lookUp(HOUR_WORDS, word);
+  const dayPart = part ? lookUp(DAY_PART_WORDS, part) : undefined;
+  const mins = Number(clockMinutes ?? minutes ?? 0);
+  if (hours === undefined) return null;
+  if (hours === 0 || hours > 12) return clock(hours, mins);
+  if (!dayPart) return clock(hours <= 6 ? hours + 12 : hours, mins);
+  // At night: the small hours ("в 2 ночи") or late evening ("в 11 ночи").
+  const isPm =
+    dayPart === "afternoon" ||
+    dayPart === "evening" ||
+    (dayPart === "night" && hours >= 6 && hours < 12);
+  return meridiem(hours, mins, isPm);
 }
 
 function parseLine(line: string, today: string): ParsedTask | null {
   let text = line;
 
+  function cut(match: RegExpExecArray) {
+    text = `${text.slice(0, match.index)} ${text.slice(match.index + match[0].length)}`;
+  }
+
   /** Removes the first match of `pattern` from the text and returns it. */
   function take(pattern: RegExp): RegExpExecArray | null {
     const match = pattern.exec(text);
-    if (match) {
-      text = `${text.slice(0, match.index)} ${text.slice(match.index + match[0].length)}`;
-    }
+    if (match) cut(match);
     return match;
+  }
+
+  /** Removes the first single time from the text and returns it. */
+  function takeTime(): string | null {
+    const twelveHour = take(MERIDIEM);
+    if (twelveHour) {
+      return meridiem(
+        Number(twelveHour[1]),
+        Number(twelveHour[2] ?? 0),
+        twelveHour[3].toLowerCase() === "p",
+      );
+    }
+    if (take(NOON)) return "12:00";
+    const spoken = [...text.matchAll(SPOKEN)].find(isSpokenTime);
+    if (spoken) {
+      cut(spoken);
+      return spokenTime(spoken);
+    }
+    const twentyFourHour = take(CLOCK);
+    return twentyFourHour
+      ? clock(Number(twentyFourHour[1]), Number(twentyFourHour[2]))
+      : null;
   }
 
   let recurrence: Recurrence | null = null;
@@ -134,19 +246,7 @@ function parseLine(line: string, today: string): ParsedTask | null {
     // "10:00-10:00" has no length; an earlier end means the next morning.
     if (endTime === time) endTime = null;
   } else {
-    const twelveHour = take(MERIDIEM);
-    if (twelveHour) {
-      time = meridiem(
-        Number(twelveHour[1]),
-        Number(twelveHour[2] ?? 0),
-        twelveHour[3] ?? "am",
-      );
-    } else {
-      const twentyFourHour = take(CLOCK);
-      if (twentyFourHour) {
-        time = clock(Number(twentyFourHour[1]), Number(twentyFourHour[2]));
-      }
-    }
+    time = takeTime();
   }
 
   const cleaned = text
