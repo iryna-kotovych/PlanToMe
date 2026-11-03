@@ -31,9 +31,11 @@
   - Done in code: Connect / Reconnect row and result page; refresh token sealed with AES-256-GCM and readable only by the server; events of today + 7 days in the list (all-day, timed, recurring, overnight; declined and working-location events hidden), kept on each device; pull to refresh; timed one-off tasks written to the primary calendar and kept in step (create, move, rename, delete), past days untouched; database table `calendar_links`.
   - Background calendar check moved to Phase 5, with the reminders that need it.
   - Independent review: 8 findings, all fixed, each with a test that fails on the old code (Reconnect now stays until reconnected; a Google outage stops the sync at once; an event made while another device deleted its task is removed; a task moved to a past day takes its event along, and the form refuses past days; retries back off; the app looks again right after connecting; unusable access is given back).
-  - Tests: 163 unit tests (calendar sync against an in-memory Supabase and Google Calendar), 23 iPhone e2e tests.
+  - Tests: 168 unit tests (calendar sync against an in-memory Supabase and Google Calendar), 23 iPhone e2e tests.
   - Server keys added to Vercel production on Nov 3 (Google client ID and secret, Supabase secret key, token encryption key), all marked sensitive.
-  - Waiting for: the owner's Google Cloud steps (Calendar API, scope, redirect address; on Nov 3 Google still refused the new redirect address), then the owner connects the calendar.
+  - Nov 3: redirect address added in Google Cloud; the owner connected the calendar, and the first syncs went through without errors.
+  - Privacy check (Nov 3): no leaks found; two small fixes.
+  - Waiting for: the owner's calendar checklist.
 
 ## Known limits
 
@@ -61,4 +63,5 @@
 - Accent buttons use near-black icons on the orange gradient: white on orange is below the 3:1 contrast minimum.
 - Real app address: https://planto-me.vercel.app (`plantome.vercel.app` was taken).
 - Google sign-in app is published "In production" without Google's verification, so calendar access doesn't expire every 7 days. No logo on the consent screen: a logo would require verification.
+- Task events in Google Calendar are private (owner's choice, Nov 3): people who can see her calendar see only "busy".
 - The token encryption key exists only in Vercel and can't be read back. Replacing it costs one Reconnect: the stored calendar access no longer opens, so the app asks to connect again.
