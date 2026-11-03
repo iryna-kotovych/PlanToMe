@@ -12,7 +12,7 @@ const fake = vi.hoisted(() => {
   };
   // Columns a new row gets when the insert leaves them out, as in Postgres.
   const DEFAULTS: Record<string, Row> = {
-    calendar_links: { summary: null, starts_at: null, ends_at: null },
+    calendar_links: { summary: null, starts_at: null, ends_at: null, event_format: null },
   };
   const tables: Record<string, Row[]> = {};
 
@@ -403,7 +403,15 @@ describe("calendar sync", () => {
     await connect();
     fake.tables.tasks = [taskRow(TASK_A)];
     fake.tables.calendar_links = [
-      { task_id: TASK_A, user_id: OWNER, event_id: "plantomehalfmade", summary: null, starts_at: null, ends_at: null },
+      {
+        task_id: TASK_A,
+        user_id: OWNER,
+        event_id: "plantomehalfmade",
+        summary: null,
+        starts_at: null,
+        ends_at: null,
+        event_format: null,
+      },
     ];
     fake.google.events.set("plantomehalfmade", { id: "plantomehalfmade", status: "confirmed", summary: "Call the bank" });
 
@@ -517,6 +525,39 @@ describe("calendar sync", () => {
 
     // From then on it is a past event and stays as it is.
     fake.tables.tasks = [];
+    fake.google.writes = [];
+    await syncCalendar(OWNER, { pull: false });
+    expect(fake.google.writes).toEqual([]);
+  });
+
+  it("writes task events as private", async () => {
+    await connect();
+    fake.tables.tasks = [taskRow(TASK_A)];
+    await syncCalendar(OWNER, { pull: false });
+    expect(eventOf(TASK_A)).toMatchObject({ visibility: "private" });
+  });
+
+  it("makes an event written before the private rule private, once", async () => {
+    await connect();
+    fake.tables.tasks = [taskRow(TASK_A)];
+    // As the app wrote it before: same task, no visibility, no format.
+    fake.tables.calendar_links = [
+      {
+        task_id: TASK_A,
+        user_id: OWNER,
+        event_id: "plantomeolder",
+        summary: "Call the bank",
+        starts_at: "2026-11-03T14:00:00.000Z",
+        ends_at: "2026-11-03T14:30:00.000Z",
+        event_format: null,
+      },
+    ];
+    fake.google.events.set("plantomeolder", { id: "plantomeolder", status: "confirmed", summary: "Call the bank" });
+
+    await syncCalendar(OWNER, { pull: false });
+    expect(fake.google.writes).toEqual(["patch plantomeolder"]);
+    expect(fake.google.events.get("plantomeolder")).toMatchObject({ visibility: "private" });
+
     fake.google.writes = [];
     await syncCalendar(OWNER, { pull: false });
     expect(fake.google.writes).toEqual([]);

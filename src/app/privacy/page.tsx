@@ -22,7 +22,7 @@ export default function PrivacyPage() {
       </Link>
 
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">Privacy policy</h1>
-      <p className="mt-2 text-sm text-muted">Last updated November 2, 2026</p>
+      <p className="mt-2 text-sm text-muted">Last updated November 3, 2026</p>
 
       <div className="mt-8 space-y-8 text-base leading-relaxed">
         <p>
@@ -35,8 +35,8 @@ export default function PrivacyPage() {
             <li>Your Google account&apos;s email address, to check that you are the owner.</li>
             <li>
               Events in your primary Google Calendar for the coming week, to show them in your
-              day list. Tasks with a time are added there as events, and PlanToMe changes or
-              deletes only the events it created for your tasks.
+              day list. Tasks with a time are added there as private events, and PlanToMe
+              changes or deletes only the events it created for your tasks.
             </li>
             <li>The tasks, habits, notes and files you add.</li>
             <li>

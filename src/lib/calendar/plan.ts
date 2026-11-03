@@ -1,11 +1,20 @@
 import { taskToRow } from "@/lib/cloud/rows";
 import type { Task } from "@/lib/types";
 
+/**
+ * The format of the events PlanToMe writes, raised whenever their body
+ * changes so that events written before are rewritten once.
+ * 2: events are private, so people who can see the calendar see only "busy".
+ */
+export const EVENT_FORMAT = 2;
+
 /** What PlanToMe writes to a task's event; start and end are UTC instants. */
 export interface PushedEvent {
   summary: string;
   start: string;
   end: string;
+  /** The EVENT_FORMAT it was written in. */
+  format: number;
 }
 
 /** A task's event in Google Calendar, and what PlanToMe last wrote to it. */
@@ -35,11 +44,13 @@ export function eventFor(task: Task): PushedEvent | null {
   const end =
     row.ends_at ??
     new Date(new Date(row.starts_at).getTime() + DEFAULT_MINUTES * 60_000).toISOString();
-  return { summary: task.title, start: row.starts_at, end };
+  return { summary: task.title, start: row.starts_at, end, format: EVENT_FORMAT };
 }
 
 function samePushed(a: PushedEvent, b: PushedEvent): boolean {
-  return a.summary === b.summary && a.start === b.start && a.end === b.end;
+  return (
+    a.summary === b.summary && a.start === b.start && a.end === b.end && a.format === b.format
+  );
 }
 
 /**

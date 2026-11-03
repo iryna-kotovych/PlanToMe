@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "@/lib/types";
-import { eventFor, planCalendarChanges, type CalendarLink } from "./plan";
+import { EVENT_FORMAT, eventFor, planCalendarChanges, type CalendarLink } from "./plan";
 
 // Invented tasks. Early November 2026 is winter time in Madrid (UTC+1).
 const TODAY = "2026-11-03";
@@ -25,6 +25,7 @@ const PUSHED = {
   summary: "Call the bank",
   start: "2026-11-03T14:00:00.000Z",
   end: "2026-11-03T14:30:00.000Z",
+  format: EVENT_FORMAT,
 };
 
 function link(taskId: string, pushed: CalendarLink["pushed"] = PUSHED): CalendarLink {
@@ -82,8 +83,15 @@ describe("planning calendar changes", () => {
           summary: "Call the bank again",
           start: "2026-11-03T15:00:00.000Z",
           end: "2026-11-03T15:30:00.000Z",
+          format: EVENT_FORMAT,
         },
       },
+    ]);
+  });
+
+  it("rewrites an event written in an older format", () => {
+    expect(plan([task("a")], [link("a", { ...PUSHED, format: EVENT_FORMAT - 1 })])).toEqual([
+      { type: "update", taskId: "a", eventId: "event-a", event: PUSHED },
     ]);
   });
 
@@ -140,6 +148,7 @@ describe("planning calendar changes", () => {
           summary: "Call the bank",
           start: "2026-11-01T14:00:00.000Z",
           end: "2026-11-01T14:30:00.000Z",
+          format: EVENT_FORMAT,
         },
       },
     ]);

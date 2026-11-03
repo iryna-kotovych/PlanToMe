@@ -38,14 +38,17 @@ const MAX_CHANGES = 40;
 const BASE32HEX = "0123456789abcdefghijklmnopqrstuv";
 const ID_CHUNK = 100;
 
-const LINK_COLUMNS = "task_id,event_id,summary,starts_at,ends_at";
+const LINK_COLUMNS = "task_id,event_id,summary,starts_at,ends_at,event_format";
 const LinkRowSchema = z.object({
   task_id: z.string(),
   event_id: z.string(),
   summary: z.string().nullable(),
   starts_at: z.string().nullable(),
   ends_at: z.string().nullable(),
+  event_format: z.number().int().nullable(),
 });
+/** Events written before formats were counted. */
+const FIRST_EVENT_FORMAT = 1;
 const TokenRowSchema = z.object({ refresh_token_encrypted: z.string().nullable() });
 
 // Access tokens last an hour: a warm server reuses them rather than asking
@@ -117,6 +120,7 @@ function toLink(row: z.infer<typeof LinkRowSchema>): CalendarLink {
           summary: row.summary,
           start: new Date(row.starts_at).toISOString(),
           end: new Date(row.ends_at).toISOString(),
+          format: row.event_format ?? FIRST_EVENT_FORMAT,
         }
       : null;
   return { taskId: row.task_id, eventId: row.event_id, pushed };
@@ -129,6 +133,7 @@ function eventBody(taskId: string, event: PushedEvent, id?: string): EventBody {
     start: { dateTime: event.start, timeZone: APP_TIME_ZONE },
     end: { dateTime: event.end, timeZone: APP_TIME_ZONE },
     status: "confirmed",
+    visibility: "private",
     extendedProperties: { private: { [TASK_ID_PROPERTY]: taskId } },
   };
 }
@@ -219,7 +224,12 @@ async function savePushed(
 ): Promise<boolean> {
   const { data, error } = await supabaseAdmin()
     .from("calendar_links")
-    .update({ summary: event.summary, starts_at: event.start, ends_at: event.end })
+    .update({
+      summary: event.summary,
+      starts_at: event.start,
+      ends_at: event.end,
+      event_format: event.format,
+    })
     .eq("user_id", userId)
     .eq("task_id", taskId)
     .eq("event_id", eventId)

@@ -49,6 +49,8 @@ export interface EventBody {
   end: { dateTime: string; timeZone: string };
   /** "confirmed" also brings back an event that was deleted in Google Calendar. */
   status?: "confirmed";
+  /** "private": people who can see the calendar, but not edit it, see only "busy". */
+  visibility?: "private";
   extendedProperties: { private: Record<string, string> };
 }
 
