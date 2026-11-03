@@ -209,4 +209,18 @@ describe("calendar on the device", () => {
     cloud.emit({ userId: null });
     expect(store.getView()).toEqual({ connection: null, events: [] });
   });
+
+  it("doesn't put back on the device an answer that arrives after signing out", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    await openStore();
+    cloud.emit({ userId: OWNER });
+    // Signing out drops the session and clears the device's copy before
+    // this store hears about it.
+    cloud.state.userId = null;
+    storage.clear();
+    answer(Response.json({ status: "connected", complete: true, events: [FRESH] }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(storage.has(CACHE_KEY)).toBe(false);
+  });
 });

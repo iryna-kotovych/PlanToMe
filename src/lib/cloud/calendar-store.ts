@@ -116,7 +116,9 @@ async function request(pull: boolean): Promise<boolean> {
   // means Google or the network let us down. The device copy stays.
   if (!response.ok) return false;
   const result = ResultSchema.safeParse(await response.json().catch(() => null));
-  if (!result.success || owner !== userId) return false;
+  // Signing out clears the device's copy without telling this store first:
+  // an answer for someone no longer signed in isn't kept.
+  if (!result.success || owner !== cloudStore.getUserId()) return false;
   const data = result.data;
   if (pull) lastPull = Date.now();
   if (data.status !== "connected") {
