@@ -338,6 +338,18 @@ async function pull(
 }
 
 /**
+ * A deleted task's past event stays in Google Calendar (past days are never
+ * changed), but its title goes from the database along with the task.
+ */
+async function forgetPastLinks(userId: string, todayStart: string) {
+  const { error } = await supabaseAdmin().rpc("forget_past_calendar_links", {
+    owner_id: userId,
+    today_start: todayStart,
+  });
+  if (error) throw error;
+}
+
+/**
  * Forgets a token Google no longer accepts, unless the owner has connected
  * again meanwhile. The row stays, so the app keeps asking to reconnect.
  */
@@ -359,6 +371,9 @@ export async function syncCalendar(
   userId: string,
   options: { pull: boolean },
 ): Promise<CalendarSyncResult> {
+  const today = dayKey(new Date());
+  // Database only, so it happens even while Google Calendar is disconnected.
+  await forgetPastLinks(userId, startOfDay(today));
   const { data, error } = await supabaseAdmin()
     .from("google_tokens")
     .select("refresh_token_encrypted")
@@ -380,7 +395,6 @@ export async function syncCalendar(
   }
 
   const google = new GoogleSession(userId, refreshToken);
-  const today = dayKey(new Date());
   try {
     const { complete, ownEventIds } = await push(google, userId, today, startOfDay(today));
     if (!options.pull) return { status: "connected", complete };

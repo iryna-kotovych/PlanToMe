@@ -117,7 +117,24 @@ const fake = vi.hoisted(() => {
     }
   }
 
-  const client = { from: (table: string) => new Query(table) };
+  const client = {
+    from: (table: string) => new Query(table),
+    // public.forget_past_calendar_links, as its migration defines it.
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name !== "forget_past_calendar_links") throw new Error(`No function ${name}`);
+      const taskIds = new Set((tables.tasks ?? []).map((task) => task.id));
+      const rows = tables.calendar_links ?? [];
+      const forgotten = rows.filter(
+        (link) =>
+          link.user_id === args.owner_id &&
+          link.starts_at != null &&
+          String(link.starts_at) < String(args.today_start) &&
+          !taskIds.has(link.task_id),
+      );
+      tables.calendar_links = rows.filter((link) => !forgotten.includes(link));
+      return { data: forgotten.length, error: null };
+    },
+  };
 
   // Google: the owner's primary calendar, by event id.
   type Event = Record<string, unknown> & { id: string; status: string };
@@ -415,6 +432,7 @@ describe("calendar sync", () => {
 
   it("leaves events of past days alone", async () => {
     await connect();
+    fake.tables.tasks = [taskRow(TASK_A, { date: "2026-11-02", starts_at: "2026-11-02T14:00:00+00:00" })];
     fake.tables.calendar_links = [
       {
         task_id: TASK_A,
@@ -502,6 +520,33 @@ describe("calendar sync", () => {
     fake.google.writes = [];
     await syncCalendar(OWNER, { pull: false });
     expect(fake.google.writes).toEqual([]);
+  });
+
+  it("forgets the title of a deleted task's past event, which stays in the calendar", async () => {
+    await connect();
+    const keys = taskRow(TASK_B, {
+      date: "2026-11-05",
+      starts_at: "2026-11-05T10:00:00+00:00",
+      title: "Pick up the keys",
+    });
+    fake.tables.tasks = [
+      taskRow(TASK_A, { date: "2026-11-05", starts_at: "2026-11-05T09:00:00+00:00" }),
+      keys,
+    ];
+    await syncCalendar(OWNER, { pull: false });
+
+    // Two days later, one of the tasks is deleted.
+    vi.setSystemTime(new Date("2026-11-07T08:00:00Z"));
+    fake.tables.tasks = [keys];
+    fake.google.writes = [];
+    await syncCalendar(OWNER, { pull: false });
+    expect(linkOf(TASK_A)).toBeUndefined();
+    expect(linkOf(TASK_B)).toMatchObject({ summary: "Pick up the keys" });
+    expect(fake.google.writes).toEqual([]);
+    expect([...fake.google.events.values()].map((event) => event.status)).toEqual([
+      "confirmed",
+      "confirmed",
+    ]);
   });
 
   it("keeps the connection when the server's key is missing", async () => {

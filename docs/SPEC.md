@@ -99,7 +99,7 @@ Owner: Iryna Kotovych · Timezone: Europe/Madrid · Interface language: **Englis
 - A one-off task **with a time**, dated today or later, is also created as an event in the primary calendar (default duration 30 min unless an end time was given). It is sent shortly after the change is saved, so changes made offline follow once they sync.
 - Editing, rescheduling or deleting that task in the app updates/deletes the matching event, as does removing its time or making it repeat. The server keeps each task's event ID (table `calendar_links`) to avoid duplicates and to recognise its own events when syncing back.
 - One-way for these events: an edit made to one in Google Calendar stays there until the task is changed in the app, and then the app's version wins. Deleting it in Google Calendar doesn't delete the task.
-- Events of past days are never changed or deleted.
+- Events of past days are never changed or deleted. When a task whose event is already past is deleted, the event stays in Google Calendar, and the server forgets its `calendar_links` row (with the title) at the next sync.
 - Untimed tasks and habits are **not** written to the calendar.
 
 **OAuth notes**
