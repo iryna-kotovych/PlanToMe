@@ -132,6 +132,60 @@ const SPOKEN = new RegExp(
 const HOUR_WORDS = wholeWords(HOUR_NUMBERS);
 const DAY_PART_WORDS = wholeWords(DAY_PARTS);
 
+// Dates with the month in words: "16 ноября", "на 16-го листопада", "Nov 16th",
+// "the 16th of November", "в понедельник, 16 ноября". Only English puts the
+// month first; in Russian "Марта 16" is more likely a name.
+
+// 1 = January … 12 = December.
+const ENGLISH_MONTHS: [number, string][] = [
+  [1, "january|jan"],
+  [2, "february|feb"],
+  [3, "march|mar"],
+  [4, "april|apr"],
+  [5, "may"],
+  [6, "june|jun"],
+  [7, "july|jul"],
+  [8, "august|aug"],
+  [9, "september|sept|sep"],
+  [10, "october|oct"],
+  [11, "november|nov"],
+  [12, "december|dec"],
+];
+const CYRILLIC_MONTHS: [number, string][] = [
+  [1, "января|январь|січня|січень"],
+  [2, "февраля|февраль|лютого|лютий"],
+  [3, "марта|март|березня|березень"],
+  [4, "апреля|апрель|квітня|квітень"],
+  [5, "мая|май|травня|травень"],
+  [6, "июня|июнь|червня|червень"],
+  [7, "июля|июль|липня|липень"],
+  [8, "августа|август|серпня|серпень"],
+  [9, "сентября|сентябрь|вересня|вересень"],
+  [10, "октября|октябрь|жовтня|жовтень"],
+  [11, "ноября|ноябрь|листопада|листопад"],
+  [12, "декабря|декабрь|грудня|грудень"],
+];
+const ALL_MONTHS = [...ENGLISH_MONTHS, ...CYRILLIC_MONTHS];
+
+const DATE_WORD = "(?:on|by|from|next|this|на|в|во|у|к|ко|до|с|со|з|від)\\s+";
+const DATE_WEEKDAY = `(?:${DATE_WORD})?(?:${anyOf(WEEKDAY_FORMS)})`;
+// A number right after "10:" or "10." is the minutes of a clock time.
+const DATE_START = `(?<![\\p{L}\\p{N}]|\\d[:.])(?:${DATE_WEEKDAY},?\\s+)?(?:${DATE_WORD})?(?:the\\s+)?`;
+const DATE_END =
+  `(?:,?\\s+(?<year>20\\d{2})(?:\\s*(?:года|году|г|року|р)\\.?${NOT_LETTER_AFTER})?)?` +
+  `(?:,?\\s+${DATE_WEEKDAY})?${NOT_LETTER_AFTER}`;
+const DAY_MONTH = new RegExp(
+  `${DATE_START}(?<day>\\d{1,2})(?:-?\\s?(?:го|ого|е|ое|st|nd|rd|th))?\\s+(?:of\\s+)?` +
+    `(?<month>${anyOf(ALL_MONTHS)})\\.?${DATE_END}`,
+  "iu",
+);
+const MONTH_DAY = new RegExp(
+  `${DATE_START}(?<month>${anyOf(ENGLISH_MONTHS)})\\.?\\s+(?:the\\s+)?` +
+    `(?<day>\\d{1,2})(?:st|nd|rd|th)?(?![:.]\\d)${DATE_END}`,
+  "iu",
+);
+const MONTH_WORDS = wholeWords(ALL_MONTHS);
+
 const DANGLING_WORD = /\s+(?:at|on|in|в|во|у|о|об|на)$/iu;
 
 function clock(hours: number, minutes: number): string | null {
@@ -171,6 +225,25 @@ function spokenTime(match: RegExpExecArray): string | null {
     dayPart === "evening" ||
     (dayPart === "night" && hours >= 6 && hours < 12);
   return meridiem(hours, mins, isPm);
+}
+
+/**
+ * The day a DAY_MONTH or MONTH_DAY match names, if it exists and isn't past.
+ * Without a year, that's the next time the date comes round.
+ */
+function namedDate(match: RegExpExecArray, today: string): string | null {
+  const { day, month, year } = match.groups ?? {};
+  const monthNumber = lookUp(MONTH_WORDS, month);
+  if (monthNumber === undefined) return null;
+  const thisYear = Number(today.slice(0, 4));
+  for (const candidate of year ? [Number(year)] : [thisYear, thisYear + 1]) {
+    const date = new Date(Date.UTC(candidate, monthNumber - 1, Number(day)));
+    // A day the month doesn't have rolls over into the next month.
+    if (date.getUTCMonth() !== monthNumber - 1) continue;
+    const key = date.toISOString().slice(0, 10);
+    if (key >= today) return key;
+  }
+  return null;
 }
 
 function parseLine(line: string, today: string): ParsedTask | null {
@@ -221,11 +294,21 @@ function parseLine(line: string, today: string): ParsedTask | null {
     }
   }
 
-  let date: string | null = null;
-  for (const [pattern, offset] of RELATIVE_DAYS) {
-    if (take(pattern)) {
-      date = addDays(today, offset);
-      break;
+  /** Removes the first date with the month in words and returns its day. */
+  function takeDate(): string | null {
+    const match = DAY_MONTH.exec(text) ?? MONTH_DAY.exec(text);
+    const day = match && namedDate(match, today);
+    if (match && day) cut(match);
+    return day;
+  }
+
+  let date = takeDate();
+  if (date === null) {
+    for (const [pattern, offset] of RELATIVE_DAYS) {
+      if (take(pattern)) {
+        date = addDays(today, offset);
+        break;
+      }
     }
   }
   if (date === null && recurrence === null) {

@@ -37,9 +37,11 @@
   - Privacy check (Nov 3): no leaks found; two small fixes.
   - Waiting for: the owner's calendar checklist.
 - **Dictation** (Nov 3): typed text understands times in words ("в 15 часов", "в 3 часа дня", "о 15 годині", "о третій", "at 7 in the evening"). So the iPhone keyboard's mic can add tasks until the app's own mic arrives in Phase 4. Tests: 172 unit tests, 23 iPhone e2e tests.
+- **Dates in words** (Nov 5): typed text understands dates with the month in words ("16 ноября", "16 листопада", "Nov 16th"). Before, the task stayed on today with the date in its title. Tests: 178 unit tests, 23 iPhone e2e tests.
 
 ## Known limits
 
+- A task dated more than 7 days ahead is saved, but the list shows it only once its day is within 7 days.
 - Until the evening wrap-up (Phase 5), an unfinished **timed** task stays on its day and disappears from view the next day.
 - The free Supabase project pauses after a week without use (a few requests a day keep it awake). Supabase emails first; **Resume project** in the dashboard brings it back with all data, up to a year later. The free plan has no time limit and is never billed: over a quota, Supabase warns, then restricts (e.g. read-only) until the quota refills next month.
 - Free plan room (Nov 2): database 11 MB of 500 MB, mostly Supabase's own tables; a task row is ~120 bytes. Files: 1 GB, so Phase 4 must shrink screenshots before storing them.
@@ -52,6 +54,8 @@
 ## Open questions
 
 - Swipe direction: now a finger swipe to the left shows the next day (like turning a page). Confirm, or flip it.
+- Days ahead: should the list reach further than 7 days, so a task dated later can be seen and checked right after adding it?
+- Digits: "16.11" now means the clock time 16:11, not November 16. Should it mean a date?
 
 ## Decisions
 

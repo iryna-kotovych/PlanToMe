@@ -169,6 +169,99 @@ describe("quickParse", () => {
     expect(parseOne("рейс в 3:30").time).toBe("03:30");
   });
 
+  it("understands a date with the month in words", () => {
+    expect(
+      parseOne("16 ноября - написать ремайндер Sunny Bakery about Order"),
+    ).toMatchObject({
+      title: "Написать ремайндер Sunny Bakery about Order",
+      date: "2026-11-16",
+      time: null,
+    });
+    const dates: [string, string][] = [
+      ["купить билеты на 16-го ноября", "2026-11-16"],
+      ["сдать отчёт до 3 декабря", "2026-12-03"],
+      ["зустріч 16 листопада", "2026-11-16"],
+      ["подзвонити 1 грудня", "2026-12-01"],
+      ["18 ноябрь оплатить счёт", "2026-11-18"],
+      ["dentist on November 16", "2026-11-16"],
+      ["dentist Nov 16th", "2026-11-16"],
+      ["dentist on the 16th of November", "2026-11-16"],
+      ["dentist 16 Nov", "2026-11-16"],
+      ["в понедельник, 16 ноября созвон", "2026-11-16"],
+      ["16 ноября, в понедельник созвон", "2026-11-16"],
+    ];
+    for (const [text, date] of dates) {
+      const task = parseOne(text);
+      expect(task.date, text).toBe(date);
+      expect(task.title, text).not.toMatch(/\d|ноябр|листопад|декабр|грудн|nov/iu);
+      expect(task.title, text).not.toMatch(/понедельник/iu);
+    }
+  });
+
+  it("takes a date without a year as its next occurrence", () => {
+    expect(parseOne("15 января оплатить страховку").date).toBe("2027-01-15");
+    expect(parseOne("30 октября отчёт").date).toBe(TODAY);
+    expect(parseOne("29 октября отчёт").date).toBe("2027-10-29");
+  });
+
+  it("takes a year when it is said", () => {
+    expect(parseOne("продлить паспорт 16 ноября 2027 года")).toMatchObject({
+      title: "Продлить паспорт",
+      date: "2027-11-16",
+    });
+    expect(parseOne("renew passport Nov 16, 2027")).toMatchObject({
+      title: "Renew passport",
+      date: "2027-11-16",
+    });
+  });
+
+  it("reads a date together with a time", () => {
+    expect(parseOne("16 ноября в 15:00 созвон")).toMatchObject({
+      title: "Созвон",
+      date: "2026-11-16",
+      time: "15:00",
+    });
+    expect(parseOne("созвон 16 ноября в 3 часа дня")).toMatchObject({
+      title: "Созвон",
+      date: "2026-11-16",
+      time: "15:00",
+    });
+    expect(parseOne("call Nov 16 15:00")).toMatchObject({
+      title: "Call",
+      date: "2026-11-16",
+      time: "15:00",
+    });
+    expect(parseOne("call at 10:30 Nov 16")).toMatchObject({
+      title: "Call",
+      date: "2026-11-16",
+      time: "10:30",
+    });
+  });
+
+  it("starts a repeat from the date said", () => {
+    expect(parseOne("каждый день с 16 ноября зарядка")).toMatchObject({
+      title: "Зарядка",
+      date: "2026-11-16",
+      recurrence: { kind: "daily" },
+    });
+  });
+
+  it("does not mistake other words or impossible dates for a date", () => {
+    for (const text of [
+      "31 ноября отчёт",
+      "29 февраля отчёт",
+      "16 ноября 2020 отчёт",
+      "Марта 16 приедет",
+      "Купить 16 яблок",
+      "Встреча 3 мартышки",
+    ]) {
+      expect(parseOne(text), text).toMatchObject({
+        title: text,
+        date: TODAY,
+      });
+    }
+  });
+
   it("does not mistake a length of time or a count for a time", () => {
     for (const text of [
       "поспать 3 часа",

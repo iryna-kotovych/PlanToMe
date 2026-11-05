@@ -208,6 +208,8 @@ In the real app the database does the moving (`public.carry_over()`, once a day 
   - Times can be digits ("15:00", "3pm") or words, as the keyboard's dictation types them: "в 15 часов", "в 3 часа дня", "о 15 годині", "о третій", "at 7 in the evening", "в полдень".
   - A number is a time only after "в/о/at" and with an hour word or a part of the day after it, or as a Ukrainian ordinal ("о третій"). So "поспать 3 часа" stays the title.
   - Without a part of the day, 1 to 6 o'clock means the afternoon ("в 3 часа" is 15:00) and 7 to 12 is taken as said. A clock time such as "3:30" is always taken as written.
+  - Dates name the month in words: "16 ноября", "на 16-го листопада", "Nov 16th", "в понедельник, 16 ноября". Without a year, a date means its next occurrence, today included. A date that doesn't exist or has passed stays in the title. Digits alone are not a date: "16.11" is the clock time 16:11.
+  - A task can be dated further ahead than the list can show (section 4.1); it appears once its day is within 7 days.
 - A small "Demo — sample data" label.
 - First-time visitors see a short, dismissible tip: swipe for the coming days, type a task, try the mic and the paperclip. Once dismissed it stays hidden in that browser.
 
